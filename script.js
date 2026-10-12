@@ -13,6 +13,8 @@
     try { api.key = localStorage.getItem(API_KEY_KEY) || ''; } catch { api.key = ''; }
   }
   const mobileSidebar = window.matchMedia('(max-width: 790px)');
+  const generatingPeople = new Set();
+  let generatingAll = false;
   let toastTimer;
 
   function loadState() {
@@ -43,7 +45,7 @@
   function renderPeople() {
     const list = $('#peopleList');
     list.innerHTML = state.people.map((person, index) => `<article class="person-card" data-person="${esc(person.id)}">
-      <div class="person-topline"><span class="person-label">PERSON ${String(index + 1).padStart(2, '0')}</span>${state.people.length > 1 ? `<button class="remove-person" data-action="remove" title="Remove person" aria-label="Remove person ${index + 1}">×</button>` : ''}</div>
+      <div class="person-topline"><span class="person-label">PERSON ${String(index + 1).padStart(2, '0')}</span><div class="person-actions"><button class="small-action write-single" data-action="generate" ${generatingAll || generatingPeople.has(person.id) ? 'disabled' : ''}>${generatingPeople.has(person.id) ? 'Writing…' : 'Write this note'}</button>${state.people.length > 1 ? `<button class="remove-person" data-action="remove" title="Remove person" aria-label="Remove person ${index + 1}">×</button>` : ''}</div></div>
       <div class="person-fields">
         <label>Name<input data-field="name" value="${esc(person.name)}" placeholder="Their name" autocomplete="off" /></label>
         <label class="email-field">Email<input data-field="email" type="email" value="${esc(person.email)}" placeholder="name@company.com" autocomplete="off" /></label>
@@ -166,6 +168,20 @@
     }
     updateSidebar();
   }
+  function updatePage() {
+    const profilePage = location.hash === '#profile';
+    const outreachPage = location.hash === '#outreach';
+    $('#composePage').hidden = profilePage;
+    $('#profilePage').hidden = !profilePage;
+    $('#breadcrumbPage').textContent = profilePage ? 'My profile' : outreachPage ? 'Outreach' : 'Compose';
+    for (const link of $('#mainNavigation').querySelectorAll('.nav-link')) {
+      const selected = profilePage ? link.hash === '#profile' : outreachPage ? link.hash === '#outreach' : link.hash === '#compose';
+      link.classList.toggle('active', selected);
+      if (selected) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+    }
+    if (outreachPage) requestAnimationFrame(() => $('#outreach').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    else window.scrollTo({ top: 0, behavior: 'auto' });
+  }
   function buildContext(person) {
     const roleProfile = person.role ? (state.roleProfiles[person.role] || { built: '', why: '', how: '', result: '' }) : { built: '', why: '', how: '', result: '' };
     return {
@@ -189,22 +205,34 @@
   }
   async function generateAll() {
     if (!api.key) { openSettings(); showToast('Connect your own API key to write notes.'); return; }
+    if (generatingAll || generatingPeople.size) { showToast('Wait for the current note to finish writing.'); return; }
     const candidates = state.people.filter(person => person.email || person.name || person.role || person.company || person.context);
     if (!candidates.length) { showToast('Add a person before writing notes.'); return; }
     const invalid = candidates.find(person => !validEmail(person.email));
     if (invalid) { showToast(`Add a valid email for ${invalid.name || 'each person'} first.`); document.querySelector(`[data-person="${CSS.escape(invalid.id)}"] [data-field="email"]`)?.focus(); return; }
     const duplicate = candidates.find((person, index) => candidates.findIndex(other => other.email.toLowerCase() === person.email.toLowerCase()) !== index);
     if (duplicate) { showToast('Each person needs a unique email address.'); return; }
-    const button = $('#generateAll'); button.disabled = true;
+    const button = $('#generateAll'); button.disabled = true; generatingAll = true; renderPeople();
     for (let index = 0; index < candidates.length; index++) {
       const person = candidates[index]; person.error = ''; button.querySelector('b').textContent = `Writing ${index + 1} of ${candidates.length}…`; renderPeople();
       try { await generatePerson(person); }
       catch (error) { person.error = error.message || 'Something went wrong while generating this note.'; }
       persist(); renderPeople();
     }
-    button.disabled = false; button.querySelector('b').textContent = 'Write my notes';
+    generatingAll = false; button.disabled = false; button.querySelector('b').textContent = 'Write my notes'; renderPeople();
     const ready = candidates.filter(person => person.subject && person.body).length;
     showToast(ready ? `${ready} ${ready === 1 ? 'note is' : 'notes are'} ready for your review.` : 'No notes were generated. Check your API settings.');
+  }
+  async function generateOne(person) {
+    if (!api.key) { openSettings(); showToast('Connect your own API key to write notes.'); return; }
+    if (generatingAll || generatingPeople.size) { showToast('Wait for the current note to finish writing.'); return; }
+    if (!validEmail(person.email)) { showToast(`Add a valid email for ${person.name || 'this person'} first.`); document.querySelector(`[data-person="${CSS.escape(person.id)}"] [data-field="email"]`)?.focus(); return; }
+    generatingPeople.add(person.id); person.error = ''; renderPeople();
+    let succeeded = false;
+    try { await generatePerson(person); succeeded = true; }
+    catch (error) { person.error = error.message || 'Something went wrong while generating this note.'; }
+    finally { generatingPeople.delete(person.id); persist(); renderPeople(); }
+    showToast(succeeded ? `A note for ${person.name || 'this person'} is ready for review.` : 'Could not write this note. Check the message on the contact card.');
   }
   async function copyText(value, label) {
     try { await navigator.clipboard.writeText(value); showToast(`${label} copied.`); }
@@ -229,6 +257,7 @@
     const person = personById(id);
     if (!person) return;
     if (action === 'remove') { if (state.people.length === 1) return; state.people = state.people.filter(item => item.id !== id); persist(); renderPeople(); }
+    if (action === 'generate') generateOne(person);
     if (action === 'copy-subject') copyText(person.subject, 'Subject');
     if (action === 'copy-body') copyText(person.body, 'Message');
     if (action === 'copy-all') copyText(`Subject: ${person.subject}\n\n${person.body}`, 'Subject and message');
@@ -245,6 +274,7 @@
   updateSidebar();
   renderRoleProfile();
   renderAbigayleStyle();
+  updatePage();
   $('#peopleList').addEventListener('input', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (!card || !field) return; const person = personById(card.dataset.person); if (!person) return; person[field] = event.target.value; persist(); if (field === 'name' || field === 'email') renderOutreach(); });
   $('#peopleList').addEventListener('change', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (card && field) { const person = personById(card.dataset.person); if (person) { person[field] = event.target.value; persist(); } } });
   $('#peopleList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.closest('[data-person]')?.dataset.person); });
@@ -264,6 +294,7 @@
   $('#sidebarBackdrop').addEventListener('click', () => { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); });
   $('#mainNavigation').addEventListener('click', () => { if (mobileSidebar.matches) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   mobileSidebar.addEventListener('change', () => { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); });
+  window.addEventListener('hashchange', updatePage);
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv);
   $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, profile, and follow-up from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], abigayleMode: false, people: [newPerson()] }; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderRoleProfile(); renderAbigayleStyle(); renderPeople(); showToast('Workspace cleared.'); });

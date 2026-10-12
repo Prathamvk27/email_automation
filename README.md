@@ -31,8 +31,8 @@ GitHub Pages serves the HTML, CSS, and JavaScript; the browser runs the app. Tha
 
 ## Features
 
-- Up to 25 separate recipients; each note is addressed individually.
+- Up to 25 separate recipients; write a note for one person or generate the whole batch.
 - Role, company, recipient context, sender profile, and optional writing direction.
-- Reusable project story profiles by target role, with an optional what/why/how/result framing style.
+- A separate **My profile** page for reusable project stories by target role, with an optional what/why/how/result framing style.
 - Editable subject and body with copy buttons and `mailto:` handoff.
 - Local outreach tracker with a two-day follow-up date, reply status, and CSV export.

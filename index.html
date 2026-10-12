@@ -18,10 +18,11 @@
         <div class="workspace-label">YOUR WORKSPACE</div>
         <nav class="nav-list" id="mainNavigation" aria-label="Main navigation">
           <a class="nav-link active" href="#compose" title="Compose" aria-label="Compose"><span class="nav-icon">✳</span><span class="nav-label">Compose</span><span class="nav-count" id="navCount">01</span></a>
+          <a class="nav-link" href="#profile" title="My profile" aria-label="My profile"><span class="nav-icon">◉</span><span class="nav-label">My profile</span></a>
           <a class="nav-link" href="#outreach" title="Outreach" aria-label="Outreach"><span class="nav-icon">↗</span><span class="nav-label">Outreach</span><span class="nav-count" id="navOutreachCount">00</span></a>
         </nav>
         <div class="sidebar-bottom">
-          <div class="privacy-card"><span class="privacy-icon">◉</span><div><strong>Your notes stay yours.</strong><p>Drafts live in this browser. Your API key stays in memory only.</p></div></div>
+          <div class="privacy-card"><span class="privacy-icon">◉</span><div><strong>Your notes stay yours.</strong><p>Drafts and profiles live in this browser.</p></div></div>
           <button class="settings-link" id="openSettings" title="API settings" aria-label="Open API settings"><span class="settings-icon">⚙</span><span class="settings-label">API settings</span><span class="settings-dot" id="apiDot"></span></button>
           <div class="sidebar-foot"><span class="avatar">P</span><span><strong>Personal workspace</strong><small>Local to this device</small></span><span class="more">···</span></div>
         </div>
@@ -29,7 +30,8 @@
       <button class="sidebar-backdrop" id="sidebarBackdrop" aria-label="Close navigation" tabindex="-1"></button>
 
       <main id="top" class="main-content">
-        <header class="topbar"><div class="topbar-left"><button class="icon-button sidebar-toggle" id="sidebarToggle" aria-label="Collapse navigation" aria-controls="mainNavigation" aria-expanded="true" title="Collapse navigation">☰</button><div class="breadcrumb">Workspace <span>/</span> <b>Compose</b></div></div><div class="topbar-right"><span class="local-badge"><i></i> Saved in this browser</span><button class="icon-button" id="topSettings" aria-label="Open API settings">⚙</button></div></header>
+        <header class="topbar"><div class="topbar-left"><button class="icon-button sidebar-toggle" id="sidebarToggle" aria-label="Collapse navigation" aria-controls="mainNavigation" aria-expanded="true" title="Collapse navigation">☰</button><div class="breadcrumb">Workspace <span>/</span> <b id="breadcrumbPage">Compose</b></div></div><div class="topbar-right"><span class="local-badge"><i></i> Saved in this browser</span><button class="icon-button" id="topSettings" aria-label="Open API settings">⚙</button></div></header>
+        <div id="composePage" class="page-content">
         <section class="welcome" id="compose">
           <div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR NEXT GOOD CONVERSATION</div><h1>Make the first note<br /><em>feel like you.</em></h1><p class="intro">A little context goes a long way. Add the people you want to reach, and shape a thoughtful first hello for each of them.</p></div>
           <div class="welcome-art" aria-hidden="true"><div class="art-sun"></div><div class="art-card"><span>hello,</span><b>there.</b><i>↗</i></div><div class="art-spark spark-a">✳</div><div class="art-spark spark-b">✳</div><div class="art-orbit"></div></div>
@@ -50,27 +52,8 @@
               <button class="add-person" id="addPerson"><span>＋</span> Add another person <small id="addRemaining">24 spots left</small></button>
             </section>
 
-            <section class="panel profile-panel">
-              <div class="section-heading"><div><span class="step">02</span><div><h2>Your base profile</h2><p>Add your name, focus, and reusable experience once. It’s included in every draft.</p></div></div><span class="optional-tag">SAVED HERE</span></div>
-              <div class="profile-grid"><label>Your name<input id="senderName" placeholder="e.g. Alex Morgan" autocomplete="name" /></label><label>Current focus<input id="senderFocus" placeholder="e.g. CS student interested in climate tech" /></label></div>
-              <label class="field-label">Experience, projects, or a detail worth mentioning<textarea id="senderContext" rows="3" placeholder="A few concrete details make a much better note. Paste a short resume summary, a project, or what you hope to learn."></textarea></label>
-            </section>
-
-            <section class="panel role-profile-panel">
-              <div class="section-heading"><div><span class="step">03</span><div><h2>Build your role profiles</h2><p>Save one project story per role. Matching details are reused for every contact with that role.</p></div></div><span class="optional-tag" id="roleProfileStatus">SAVED HERE</span></div>
-              <label class="role-picker-label" for="roleProfileRole">Choose a role profile</label>
-              <select id="roleProfileRole" class="role-profile-select" aria-describedby="roleProfileHint"></select>
-              <p class="profile-hint" id="roleProfileHint">Use your own resume details. These fields save automatically in this browser and are added to matching emails.</p>
-              <div class="story-fields">
-                <label>What did you build or do?<textarea id="storyBuilt" rows="2" placeholder="Name the project, feature, or contribution."></textarea></label>
-                <label>Why did you build or do it?<textarea id="storyWhy" rows="2" placeholder="What problem, need, or goal led to it?"></textarea></label>
-                <label>How did you build or do it?<textarea id="storyHow" rows="2" placeholder="Your approach, tools, and your own contribution."></textarea></label>
-                <label>What was the result?<textarea id="storyResult" rows="2" placeholder="A measured result, outcome, or what you learned. Leave blank if unknown."></textarea></label>
-              </div>
-            </section>
-
             <section class="panel direction-panel">
-              <div class="section-heading"><div><span class="step">04</span><div><h2>Set the direction</h2><p>One extra thought can help the draft sound more like you.</p></div></div><span class="optional-tag">OPTIONAL</span></div>
+              <div class="section-heading"><div><span class="step">02</span><div><h2>Set the direction</h2><p>One extra thought can help the draft sound more like you.</p></div></div><span class="optional-tag">OPTIONAL</span></div>
               <div class="style-preset-row"><button type="button" class="style-preset" id="abigayleStyle" aria-pressed="false">✳ Abigayle framing <span class="preset-state" id="abigayleState">Off</span></button><p>When on, project sentences follow <b>what I built → why → how → result</b>, using only details you entered.</p></div>
               <textarea id="customPrompt" rows="3" placeholder="For example: Keep it under 100 words, mention my campus robotics project, and ask if they have 15 minutes next week."></textarea>
               <div class="prompt-foot"><span>✦ This note is included in both writing passes.</span><span id="promptChars">0 / 500</span></div>
@@ -87,6 +70,30 @@
 
         <section class="outreach-section" id="outreach"><div class="outreach-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEP THE CONVERSATION OPEN</div><h2>Your outreach <span id="outreachTotal">(0)</span></h2><p>Mark a note as sent to start its follow-up timer. Due dates appear here when you return.</p></div><div class="outreach-actions"><button class="outline-button" id="exportCsv">Export list <span>↓</span></button><button class="text-button" id="clearOutreach">Clear workspace</button></div></div><div id="outreachList" class="outreach-list"></div><div id="emptyOutreach" class="empty-state"><span>↗</span><b>Your conversations start here.</b><p>Generate a note, then mark it sent to keep track of replies and follow-ups.</p></div></section>
         <footer class="footer"><a class="brand mini" href="#top"><span class="brand-mark">g<span>.</span></span><span>goodsend</span></a><span>Small notes. Good conversations.</span><span>Made with care <i>✳</i></span></footer>
+        </div>
+        <section class="profile-page" id="profilePage" aria-labelledby="profilePageTitle" hidden>
+          <div class="profile-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR REUSABLE CONTEXT</div><h1 id="profilePageTitle">My writing profile</h1><p>Set your background and role specific stories here once. Goodsend reuses them when you write a note for a matching role.</p></div><a class="outline-button" href="#compose">Back to compose <span>↗</span></a></div>
+          <div class="profile-page-content">
+            <section class="panel profile-panel">
+              <div class="section-heading"><div><span class="step">01</span><div><h2>Your base profile</h2><p>Add your name, focus, and experience that applies across roles.</p></div></div><span class="optional-tag">SAVED HERE</span></div>
+              <div class="profile-grid"><label>Your name<input id="senderName" placeholder="e.g. Alex Morgan" autocomplete="name" /></label><label>Current focus<input id="senderFocus" placeholder="e.g. CS student interested in climate tech" /></label></div>
+              <label class="field-label">General background or transferable experience<textarea id="senderContext" rows="4" placeholder="Add a short summary of your background, strengths, and interests that apply across roles. Put role specific project stories below."></textarea></label>
+            </section>
+            <section class="panel role-profile-panel">
+              <div class="section-heading"><div><span class="step">02</span><div><h2>Role specific project stories</h2><p>Save one story per role. Matching details are reused for every contact with that role.</p></div></div><span class="optional-tag" id="roleProfileStatus">SAVED HERE</span></div>
+              <label class="role-picker-label" for="roleProfileRole">Choose a role profile</label>
+              <select id="roleProfileRole" class="role-profile-select" aria-describedby="roleProfileHint"></select>
+              <p class="profile-hint" id="roleProfileHint">Use your own resume details. These fields save automatically in this browser and are added to matching emails.</p>
+              <div class="story-fields">
+                <label>What did you build or do?<textarea id="storyBuilt" rows="2" placeholder="Name the project, feature, or contribution."></textarea></label>
+                <label>Why did you build or do it?<textarea id="storyWhy" rows="2" placeholder="What problem, need, or goal led to it?"></textarea></label>
+                <label>How did you build or do it?<textarea id="storyHow" rows="2" placeholder="Your approach, tools, and your own contribution."></textarea></label>
+                <label>What was the result?<textarea id="storyResult" rows="2" placeholder="A measured result, outcome, or what you learned. Leave blank if unknown."></textarea></label>
+              </div>
+              <p class="profile-footer-note">Your profiles are stored in this browser. They are sent to your model provider only when you generate a matching email.</p>
+            </section>
+          </div>
+        </section>
       </main>
     </div>
 
