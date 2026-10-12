@@ -28,8 +28,12 @@
       const writingStyles = normalizeWritingStyles(saved.writingStyles);
       const requestedStyleId = saved.selectedStyleId || (saved.abigayleMode ? 'abigayle' : 'natural');
       const selectedStyleId = [...builtInStyles, ...writingStyles].some(style => style.id === requestedStyleId) ? requestedStyleId : 'natural';
-      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', roleProfiles: normalizeRoleProfiles(saved.roleProfiles), roleProfileEditorRole: roles.includes(saved.roleProfileEditorRole) ? saved.roleProfileEditorRole : roles[0], writingStyles, selectedStyleId, people: Array.isArray(saved.people) && saved.people.length ? saved.people.slice(0, MAX_PEOPLE) : [newPerson()] };
-    } catch { return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], writingStyles: [], selectedStyleId: 'natural', people: [newPerson()] }; }
+      const people = Array.isArray(saved.people) ? saved.people.slice(0, MAX_PEOPLE) : [];
+      const priorOutreach = Array.isArray(saved.outreach) ? saved.outreach : [];
+      const archivedPeople = people.filter(person => person.subject || person.body || person.status !== 'draft');
+      const composePeople = people.filter(person => !person.subject && !person.body && person.status === 'draft');
+      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', roleProfiles: normalizeRoleProfiles(saved.roleProfiles), roleProfileEditorRole: roles.includes(saved.roleProfileEditorRole) ? saved.roleProfileEditorRole : roles[0], writingStyles, selectedStyleId, people: composePeople.length ? composePeople : [newPerson()], outreach: [...archivedPeople, ...priorOutreach] };
+    } catch { return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; }
   }
   function normalizeWritingStyles(styles) {
     if (!Array.isArray(styles)) return [];
@@ -120,13 +124,13 @@
   }
   function updateSummary() {
     const count = state.people.length;
-    const drafts = state.people.filter(person => person.subject && person.body).length;
-    const due = state.people.filter(person => person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date()).length;
+    const drafts = state.outreach.filter(person => person.subject && person.body && person.status === 'draft').length;
+    const due = state.outreach.filter(person => person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date()).length;
     $('#peopleStat').innerHTML = `${String(count).padStart(2, '0')} <span>/ 25</span>`;
     $('#draftStat').textContent = String(drafts).padStart(2, '0');
     $('#dueStat').textContent = String(due).padStart(2, '0');
     $('#navCount').textContent = String(count).padStart(2, '0');
-    $('#navOutreachCount').textContent = String(state.people.filter(person => person.subject || person.status !== 'draft').length).padStart(2, '0');
+    $('#navOutreachCount').textContent = String(state.outreach.length).padStart(2, '0');
     $('#peopleCounter').textContent = `${String(count).padStart(2, '0')} / 25`;
     $('#addRemaining').textContent = count === MAX_PEOPLE ? 'Limit reached' : `${MAX_PEOPLE - count} spots left`;
     $('#addPerson').disabled = count >= MAX_PEOPLE;
@@ -140,21 +144,31 @@
     $('#configureApi').innerHTML = ready ? 'Update API settings <span>↗</span>' : 'Set up API <span>↗</span>';
   }
   function renderOutreach() {
-    const items = state.people.filter(person => person.subject || person.body || person.status !== 'draft');
+    const items = state.outreach;
     $('#outreachTotal').textContent = `(${items.length})`;
     $('#emptyOutreach').hidden = items.length > 0;
     $('#outreachList').innerHTML = items.map(person => {
       const isDue = person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date();
       const status = person.status === 'replied' ? '<span class="status-pill replied">Reply received</span>' : person.status === 'sent' ? `<span class="status-pill ${isDue ? 'due' : ''}">${person.replyCheck === 'no_reply' ? 'No reply yet · check ' : isDue ? 'Follow-up due' : 'Follow up '}${new Date(person.followUpAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : '<span class="status-pill">Draft ready</span>';
       const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open email ↗</button>` : `<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open email ↗</button>`;
-      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.role, person.company].filter(Boolean).join(' · ') || person.email || 'Role not set')}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}</div></article>`;
+      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.role, person.company].filter(Boolean).join(' · ') || person.email || 'Role not set')}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
   }
   function showToast(message) {
     const el = $('#toast'); el.textContent = message; el.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
   }
-  function personById(id) { return state.people.find(person => person.id === id); }
+  function personById(id) { return state.people.find(person => person.id === id) || state.outreach.find(person => person.id === id); }
+  function archiveGeneratedPerson(person) {
+    person.error = '';
+    state.outreach.unshift(person);
+    state.people = state.people.filter(item => item.id !== person.id);
+  }
+  function ensureComposeRow() {
+    const hasEmptyRow = state.people.some(person => !person.name && !person.email && !person.role && !person.company && !person.context && !person.subject && !person.body);
+    if (!hasEmptyRow && state.people.length < MAX_PEOPLE) state.people.push(newPerson());
+    if (!state.people.length) state.people.push(newPerson());
+  }
   function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
   function openSettings() {
     $('#apiBase').value = api.base; $('#apiModel').value = api.model; $('#apiKey').value = api.key;
@@ -262,13 +276,14 @@
     const button = $('#generateAll'); button.disabled = true; generatingAll = true; renderPeople();
     for (let index = 0; index < candidates.length; index++) {
       const person = candidates[index]; person.error = ''; button.querySelector('b').textContent = `Writing ${index + 1} of ${candidates.length}…`; renderPeople();
-      try { await generatePerson(person); }
+      try { await generatePerson(person); archiveGeneratedPerson(person); }
       catch (error) { person.error = error.message || 'Something went wrong while generating this note.'; }
       persist(); renderPeople();
     }
+    ensureComposeRow();
     generatingAll = false; button.disabled = false; button.querySelector('b').textContent = 'Write my notes'; renderPeople();
     const ready = candidates.filter(person => person.subject && person.body).length;
-    showToast(ready ? `${ready} ${ready === 1 ? 'note is' : 'notes are'} ready for your review.` : 'No notes were generated. Check your API settings.');
+    showToast(ready ? `${ready} ${ready === 1 ? 'note is' : 'notes are'} saved in Outreach.` : 'No notes were generated. Check your API settings.');
   }
   async function generateOne(person) {
     if (!api.key) { openSettings(); showToast('Connect your own API key to write notes.'); return; }
@@ -278,8 +293,12 @@
     let succeeded = false;
     try { await generatePerson(person); succeeded = true; }
     catch (error) { person.error = error.message || 'Something went wrong while generating this note.'; }
-    finally { generatingPeople.delete(person.id); persist(); renderPeople(); }
-    showToast(succeeded ? `A note for ${person.name || 'this person'} is ready for review.` : 'Could not write this note. Check the message on the contact card.');
+    finally {
+      generatingPeople.delete(person.id);
+      if (succeeded) { archiveGeneratedPerson(person); ensureComposeRow(); }
+      persist(); renderPeople();
+    }
+    showToast(succeeded ? `The note for ${person.name || 'this person'} is saved in Outreach.` : 'Could not write this note. Check the message on the contact card.');
   }
   async function copyText(value, label) {
     try { await navigator.clipboard.writeText(value); showToast(`${label} copied.`); }
@@ -295,7 +314,7 @@
     person.status = 'sent'; person.sentAt = new Date().toISOString(); person.followUpAt = new Date(Date.now() + FOLLOW_UP_DAYS * 86400000).toISOString(); person.repliedAt = null; persist(); renderPeople(); showToast('Marked sent. Your follow-up will be due in two days.');
   }
   function exportCsv() {
-    const rows = [['name','email','role','company','status','subject','body','sent_at','follow_up_at'], ...state.people.filter(person => person.email || person.subject).map(person => [person.name, person.email, person.role, person.company, person.status, person.subject, person.body, person.sentAt || '', person.followUpAt || ''])];
+    const rows = [['name','email','role','company','status','subject','body','sent_at','follow_up_at'], ...[...state.outreach, ...state.people].filter(person => person.email || person.subject).map(person => [person.name, person.email, person.role, person.company, person.status, person.subject, person.body, person.sentAt || '', person.followUpAt || ''])];
     if (rows.length === 1) { showToast('There are no contacts to export yet.'); return; }
     const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'goodsend-outreach.csv'; link.click(); URL.revokeObjectURL(link.href);
@@ -361,5 +380,5 @@
   window.addEventListener('hashchange', updatePage);
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv);
-  $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, profile, and follow-up from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], writingStyles: [], selectedStyleId: 'natural', people: [newPerson()] }; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderRoleProfile(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
+  $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, profile, and follow-up from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderRoleProfile(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
 })();
