@@ -20,11 +20,11 @@ Each person is drafted with two API calls: the first extracts grounded facts and
 
 The repository includes a GitHub Actions workflow to publish this folder as a Pages site. Push the files to the `main` branch of the `email_automation` repository, then in GitHub open **Settings → Pages** and select **GitHub Actions** as the build and deployment source. The workflow publishes on future pushes to `main`.
 
-GitHub Pages is static hosting. The site cannot safely keep a shared API secret, send messages in the background, or check Gmail for replies on a schedule. This version keeps the API key in the visitor's tab, opens the user's own mail app to send, and tracks replies only when the user records them. The follow-up list becomes due after two days when the site is open; it does not send background notifications. Gmail sending/reply sync would need a backend and explicit account authorization.
+GitHub Pages serves the HTML, CSS, and JavaScript; the browser runs the app. That is enough for this version to save your workspace locally, call a model provider directly from your browser, and open your mail app with a prepared message. Your provider must allow browser requests from the site (CORS). The site has no backend, so it cannot safely keep a shared API secret, send messages in the background, or check Gmail for replies on a schedule. The API key is held in the current tab only. The follow-up list becomes due after two days when you return; it does not send background notifications. Gmail sending/reply sync would need a backend and explicit account authorization.
 
 ## Data and privacy
 
-- Contacts, profile notes, prompts, and drafts stay in this browser's local storage until cleared.
+- Contacts, base profile, role-specific project profiles, style choice, prompts, and drafts stay in this browser's local storage until cleared.
 - API keys are held only in the current page's memory and are discarded on reload/close.
 - When you generate a draft, the sender profile, recipient name/role/company/context, and custom direction are sent to the API endpoint you configured. The recipient email address stays in this browser and is not sent to the model. Review the provider's data handling terms before adding resume details.
 - Do not put secrets in the source code or commit an API key.
@@ -33,5 +33,6 @@ GitHub Pages is static hosting. The site cannot safely keep a shared API secret,
 
 - Up to 25 separate recipients; each note is addressed individually.
 - Role, company, recipient context, sender profile, and optional writing direction.
+- Reusable project story profiles by target role, with an optional what/why/how/result framing style.
 - Editable subject and body with copy buttons and `mailto:` handoff.
 - Local outreach tracker with a two-day follow-up date, reply status, and CSV export.

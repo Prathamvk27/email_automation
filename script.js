@@ -14,8 +14,15 @@
   function loadState() {
     try {
       const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', people: Array.isArray(saved.people) && saved.people.length ? saved.people.slice(0, MAX_PEOPLE) : [newPerson()] };
-    } catch { return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', people: [newPerson()] }; }
+      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', roleProfiles: normalizeRoleProfiles(saved.roleProfiles), roleProfileEditorRole: roles.includes(saved.roleProfileEditorRole) ? saved.roleProfileEditorRole : roles[0], abigayleMode: Boolean(saved.abigayleMode), people: Array.isArray(saved.people) && saved.people.length ? saved.people.slice(0, MAX_PEOPLE) : [newPerson()] };
+    } catch { return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], abigayleMode: false, people: [newPerson()] }; }
+  }
+  function normalizeRoleProfiles(profiles) {
+    if (!profiles || typeof profiles !== 'object' || Array.isArray(profiles)) return {};
+    return Object.fromEntries(roles.map(role => {
+      const profile = profiles[role] && typeof profiles[role] === 'object' ? profiles[role] : {};
+      return [role, { built: typeof profile.built === 'string' ? profile.built : '', why: typeof profile.why === 'string' ? profile.why : '', how: typeof profile.how === 'string' ? profile.how : '', result: typeof profile.result === 'string' ? profile.result : '' }];
+    }));
   }
   function loadApiPreferences() {
     try {
@@ -44,6 +51,21 @@
       ${person.error ? `<div class="draft-error">${esc(person.error)}</div>` : ''}
     </article>`).join('');
     updateSummary();
+  }
+  function renderRoleProfile() {
+    const picker = $('#roleProfileRole');
+    picker.innerHTML = roles.map(role => `<option value="${esc(role)}">${esc(role)}</option>`).join('');
+    picker.value = state.roleProfileEditorRole;
+    const profile = state.roleProfiles[state.roleProfileEditorRole] || { built: '', why: '', how: '', result: '' };
+    for (const field of ['built', 'why', 'how', 'result']) $(`#story${field[0].toUpperCase()}${field.slice(1)}`).value = profile[field];
+    const hasDetails = Object.values(profile).some(value => value.trim());
+    $('#roleProfileStatus').textContent = hasDetails ? 'PROFILE SAVED' : 'READY TO ADD';
+  }
+  function renderAbigayleStyle() {
+    const button = $('#abigayleStyle');
+    button.setAttribute('aria-pressed', String(state.abigayleMode));
+    button.classList.toggle('selected', state.abigayleMode);
+    $('#abigayleState').textContent = state.abigayleMode ? 'On' : 'Off';
   }
   function updateSummary() {
     const count = state.people.length;
@@ -134,8 +156,10 @@
     updateSidebar();
   }
   function buildContext(person) {
+    const roleProfile = person.role ? (state.roleProfiles[person.role] || { built: '', why: '', how: '', result: '' }) : { built: '', why: '', how: '', result: '' };
     return {
       senderName: state.senderName.trim(), senderFocus: state.senderFocus.trim(), senderExperience: state.senderContext.trim(),
+      roleProfile, framingStyle: state.abigayleMode ? 'abigayle_what_why_how_result' : 'natural',
       recipientName: person.name.trim(), targetRole: person.role, company: person.company.trim(), recipientContext: person.context.trim(), customDirection: state.customPrompt.trim()
     };
   }
@@ -143,7 +167,8 @@
     const context = buildContext(person);
     const factPrompt = `You are a careful outreach writing assistant. Use only the information below. Return a short grounded fact sheet of useful facts and a separate list of anything that must not be claimed. Do not infer achievements, relationships, company facts, or experience. Missing information must stay missing. Keep the facts concise.\n\n${JSON.stringify(context)}`;
     const facts = await requestCompletion([{ role: 'system', content: 'Extract grounded facts for a personal cold email. Never invent facts.' }, { role: 'user', content: factPrompt }], 0.2);
-    const draftPrompt = `Write one concise, warm, human cold outreach email based only on this context and fact sheet. Avoid generic flattery, fake familiarity, exaggerated claims, and salesy language. Use a natural greeting and one small, clear ask. Aim for 75–125 words unless the optional direction says otherwise. Return ONLY valid JSON with exactly two string fields: subject and body. No markdown fences.\n\nContext: ${JSON.stringify(context)}\nGrounded fact sheet: ${facts}`;
+    const styleInstruction = context.framingStyle === 'abigayle_what_why_how_result' ? 'When using the role profile project, shape its project sentence in this order: what I built or did → why I did it → how I did it → result. Make the sequence sound natural and specific. Use only the supplied fields. If the result is blank, do not invent one; omit it or describe only a supplied qualitative outcome. Do not force this structure onto unrelated sentences.' : 'Write in a natural first-person style using the supplied details.';
+    const draftPrompt = `Write one concise, warm, human cold outreach email based only on this context and fact sheet. Avoid generic flattery, fake familiarity, exaggerated claims, and salesy language. Use a natural greeting and one small, clear ask. Aim for 75–125 words unless the optional direction says otherwise. ${styleInstruction} Return ONLY valid JSON with exactly two string fields: subject and body. No markdown fences.\n\nContext: ${JSON.stringify(context)}\nGrounded fact sheet: ${facts}`;
     const raw = await requestCompletion([{ role: 'system', content: 'You write thoughtful, specific outreach emails that sound like a real person. Follow the required JSON format.' }, { role: 'user', content: draftPrompt }], 0.75);
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     let result;
@@ -207,6 +232,8 @@
   $('#senderName').value = state.senderName; $('#senderFocus').value = state.senderFocus; $('#senderContext').value = state.senderContext; $('#customPrompt').value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`;
   setApiStatus();
   updateSidebar();
+  renderRoleProfile();
+  renderAbigayleStyle();
   $('#peopleList').addEventListener('input', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (!card || !field) return; const person = personById(card.dataset.person); if (!person) return; person[field] = event.target.value; persist(); if (field === 'name' || field === 'email') renderOutreach(); });
   $('#peopleList').addEventListener('change', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (card && field) { const person = personById(card.dataset.person); if (person) { person[field] = event.target.value; persist(); } } });
   $('#peopleList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.closest('[data-person]')?.dataset.person); });
@@ -214,6 +241,13 @@
   $('#addPerson').addEventListener('click', () => { if (state.people.length >= MAX_PEOPLE) return; state.people.push(newPerson()); persist(); renderPeople(); $('#peopleList article:last-child [data-field="name"]').focus(); });
   for (const [id, key] of [['senderName','senderName'], ['senderFocus','senderFocus'], ['senderContext','senderContext']]) $(`#${id}`).addEventListener('input', event => { state[key] = event.target.value; persist(); });
   $('#customPrompt').addEventListener('input', event => { state.customPrompt = event.target.value.slice(0, 500); if (event.target.value.length > 500) event.target.value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; persist(); });
+  $('#roleProfileRole').addEventListener('change', event => { state.roleProfileEditorRole = event.target.value; persist(); renderRoleProfile(); });
+  for (const field of ['built', 'why', 'how', 'result']) $(`#story${field[0].toUpperCase()}${field.slice(1)}`).addEventListener('input', event => {
+    const profile = state.roleProfiles[state.roleProfileEditorRole] || { built: '', why: '', how: '', result: '' };
+    profile[field] = event.target.value; state.roleProfiles[state.roleProfileEditorRole] = profile; persist();
+    const hasDetails = Object.values(profile).some(value => value.trim()); $('#roleProfileStatus').textContent = hasDetails ? 'PROFILE SAVED' : 'READY TO ADD';
+  });
+  $('#abigayleStyle').addEventListener('click', () => { state.abigayleMode = !state.abigayleMode; renderAbigayleStyle(); persist(); showToast(state.abigayleMode ? 'Abigayle framing enabled for new drafts.' : 'Natural framing enabled for new drafts.'); });
   $('#openSettings').addEventListener('click', openSettings); $('#topSettings').addEventListener('click', openSettings); $('#configureApi').addEventListener('click', openSettings);
   $('#sidebarToggle').addEventListener('click', toggleSidebar);
   $('#sidebarBackdrop').addEventListener('click', () => { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); });
@@ -221,5 +255,5 @@
   mobileSidebar.addEventListener('change', () => { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); });
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv);
-  $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, and follow-up from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', people: [newPerson()] }; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderPeople(); showToast('Workspace cleared.'); });
+  $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, profile, and follow-up from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], abigayleMode: false, people: [newPerson()] }; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderRoleProfile(); renderAbigayleStyle(); renderPeople(); showToast('Workspace cleared.'); });
 })();

@@ -51,13 +51,27 @@
             </section>
 
             <section class="panel profile-panel">
-              <div class="section-heading"><div><span class="step">02</span><div><h2>A little about you</h2><p>Use real details from your resume or experience. The drafts won’t invent credentials.</p></div></div><span class="optional-tag">YOUR CONTEXT</span></div>
+              <div class="section-heading"><div><span class="step">02</span><div><h2>Your base profile</h2><p>Add your name, focus, and reusable experience once. It’s included in every draft.</p></div></div><span class="optional-tag">SAVED HERE</span></div>
               <div class="profile-grid"><label>Your name<input id="senderName" placeholder="e.g. Alex Morgan" autocomplete="name" /></label><label>Current focus<input id="senderFocus" placeholder="e.g. CS student interested in climate tech" /></label></div>
               <label class="field-label">Experience, projects, or a detail worth mentioning<textarea id="senderContext" rows="3" placeholder="A few concrete details make a much better note. Paste a short resume summary, a project, or what you hope to learn."></textarea></label>
             </section>
 
+            <section class="panel role-profile-panel">
+              <div class="section-heading"><div><span class="step">03</span><div><h2>Build your role profiles</h2><p>Save one project story per role. Matching details are reused for every contact with that role.</p></div></div><span class="optional-tag" id="roleProfileStatus">SAVED HERE</span></div>
+              <label class="role-picker-label" for="roleProfileRole">Choose a role profile</label>
+              <select id="roleProfileRole" class="role-profile-select" aria-describedby="roleProfileHint"></select>
+              <p class="profile-hint" id="roleProfileHint">Use your own resume details. These fields save automatically in this browser and are added to matching emails.</p>
+              <div class="story-fields">
+                <label>What did you build or do?<textarea id="storyBuilt" rows="2" placeholder="Name the project, feature, or contribution."></textarea></label>
+                <label>Why did you build or do it?<textarea id="storyWhy" rows="2" placeholder="What problem, need, or goal led to it?"></textarea></label>
+                <label>How did you build or do it?<textarea id="storyHow" rows="2" placeholder="Your approach, tools, and your own contribution."></textarea></label>
+                <label>What was the result?<textarea id="storyResult" rows="2" placeholder="A measured result, outcome, or what you learned. Leave blank if unknown."></textarea></label>
+              </div>
+            </section>
+
             <section class="panel direction-panel">
-              <div class="section-heading"><div><span class="step">03</span><div><h2>Set the direction</h2><p>One extra thought can help the draft sound more like you.</p></div></div><span class="optional-tag">OPTIONAL</span></div>
+              <div class="section-heading"><div><span class="step">04</span><div><h2>Set the direction</h2><p>One extra thought can help the draft sound more like you.</p></div></div><span class="optional-tag">OPTIONAL</span></div>
+              <div class="style-preset-row"><button type="button" class="style-preset" id="abigayleStyle" aria-pressed="false">✳ Abigayle framing <span class="preset-state" id="abigayleState">Off</span></button><p>When on, project sentences follow <b>what I built → why → how → result</b>, using only details you entered.</p></div>
               <textarea id="customPrompt" rows="3" placeholder="For example: Keep it under 100 words, mention my campus robotics project, and ask if they have 15 minutes next week."></textarea>
               <div class="prompt-foot"><span>✦ This note is included in both writing passes.</span><span id="promptChars">0 / 500</span></div>
             </section>
