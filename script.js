@@ -1,6 +1,7 @@
 (() => {
   const STORE_KEY = 'goodsend.workspace.v1';
   const API_PREFS_KEY = 'goodsend.api.preferences.v1';
+  const API_KEY_KEY = 'goodsend.api.key.v1';
   const MAX_PEOPLE = 25;
   const FOLLOW_UP_DAYS = 2;
   const roles = ['Software engineer', 'Frontend engineer', 'Backend engineer', 'Data / ML', 'Product', 'Design', 'Research', 'Marketing', 'Operations', 'Founder / executive', 'Other'];
@@ -8,6 +9,9 @@
   const newPerson = () => ({ id: crypto.randomUUID(), name: '', email: '', role: '', company: '', context: '', subject: '', body: '', status: 'draft', sentAt: null, followUpAt: null, repliedAt: null });
   let state = loadState();
   let api = { ...loadApiPreferences(), key: '' };
+  if (api.rememberApiKey) {
+    try { api.key = localStorage.getItem(API_KEY_KEY) || ''; } catch { api.key = ''; }
+  }
   const mobileSidebar = window.matchMedia('(max-width: 790px)');
   let toastTimer;
 
@@ -27,8 +31,8 @@
   function loadApiPreferences() {
     try {
       const saved = JSON.parse(localStorage.getItem(API_PREFS_KEY) || '{}');
-      return { base: typeof saved.base === 'string' ? saved.base : '', model: typeof saved.model === 'string' ? saved.model : '' };
-    } catch { return { base: '', model: '' }; }
+      return { base: typeof saved.base === 'string' ? saved.base : '', model: typeof saved.model === 'string' ? saved.model : '', rememberApiKey: saved.rememberApiKey === true };
+    } catch { return { base: '', model: '', rememberApiKey: false }; }
   }
   function persist() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { showToast('Browser storage is full. Export your drafts to keep a copy.'); }
@@ -107,6 +111,7 @@
   function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
   function openSettings() {
     $('#apiBase').value = api.base; $('#apiModel').value = api.model; $('#apiKey').value = api.key;
+    $('#rememberApiKey').checked = api.rememberApiKey;
     $('#testStatus').textContent = ''; $('#testStatus').classList.remove('error'); $('#settingsDialog').showModal();
   }
   function endpoint() { return `${api.base.replace(/\/+$/, '')}/chat/completions`; }
@@ -128,13 +133,19 @@
     finally { api = previous; }
   }
   function saveApi() {
-    api = { base: $('#apiBase').value.trim(), model: $('#apiModel').value.trim(), key: $('#apiKey').value.trim() };
+    api = { base: $('#apiBase').value.trim(), model: $('#apiModel').value.trim(), key: $('#apiKey').value.trim(), rememberApiKey: $('#rememberApiKey').checked };
     if (!api.base || !api.model) { showToast('Add the API URL and model first.'); return; }
-    let preferencesSaved = true;
-    try { localStorage.setItem(API_PREFS_KEY, JSON.stringify({ base: api.base, model: api.model })); }
+    let preferencesSaved = true; let keyStorageSaved = true;
+    try { localStorage.setItem(API_PREFS_KEY, JSON.stringify({ base: api.base, model: api.model, rememberApiKey: api.rememberApiKey })); }
     catch { preferencesSaved = false; }
+    try {
+      if (api.rememberApiKey && api.key) localStorage.setItem(API_KEY_KEY, api.key);
+      else localStorage.removeItem(API_KEY_KEY);
+    } catch { keyStorageSaved = false; }
+    if (!preferencesSaved && api.rememberApiKey) { try { localStorage.removeItem(API_KEY_KEY); } catch { /* Keep the failure path private; the key remains tab-only. */ } }
     setApiStatus(); $('#settingsDialog').close();
-    showToast(preferencesSaved ? (api.key ? 'API ready in this tab. URL and model are saved on this device.' : 'URL and model saved. Add your API key in this tab to write notes.') : (api.key ? 'API ready in this tab, but this browser could not save the URL and model.' : 'Add your API key in this tab. This browser could not save the URL and model.'));
+    const message = !preferencesSaved && api.rememberApiKey && api.key ? 'API ready in this tab, but the remember setting could not be saved. The key will clear on reload.' : !keyStorageSaved && api.rememberApiKey && api.key ? 'API ready in this tab, but the key could not be remembered and will clear on reload.' : api.key && api.rememberApiKey ? 'API ready. URL, model, and key are remembered in this browser.' : api.key ? `API ready in this tab. ${preferencesSaved ? 'URL and model saved.' : 'URL and model could not be saved.'} Key clears on reload.` : !preferencesSaved ? 'This browser could not save the URL and model. Enter an API key before writing notes.' : api.rememberApiKey ? 'URL and model saved. Add an API key to remember before writing notes.' : 'URL and model saved. Add your API key in this tab to write notes.';
+    showToast(message);
   }
   function updateSidebar() {
     const collapsed = localStorage.getItem('goodsend.sidebar.collapsed') === 'true';
