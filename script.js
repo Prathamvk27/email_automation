@@ -2,6 +2,7 @@
   const STORE_KEY = 'goodsend.workspace.v1';
   const API_PREFS_KEY = 'goodsend.api.preferences.v1';
   const API_KEY_KEY = 'goodsend.api.key.v1';
+  const GMAIL_PREFS_KEY = 'goodsend.gmail.preferences.v1';
   const RESUME_DB_NAME = 'goodsend.local.assets.v1';
   const MAX_PEOPLE = 25;
   const MAX_STORIES_PER_ROLE = 10;
@@ -15,6 +16,9 @@
   const newPerson = () => ({ id: crypto.randomUUID(), name: '', email: '', role: '', company: '', context: '', subject: '', body: '', status: 'draft', sentAt: null, followUpAt: null, repliedAt: null });
   let state = loadState();
   let api = { ...loadApiPreferences(), key: '' };
+  let gmailSettings = loadGmailSettings();
+  let gmailSession = { accessToken: '', expiresAt: 0 };
+  const gmailDrafting = new Set();
   if (api.rememberApiKey) {
     try { api.key = localStorage.getItem(API_KEY_KEY) || ''; } catch { api.key = ''; }
   }
@@ -77,6 +81,12 @@
       return { base: typeof saved.base === 'string' ? saved.base : '', model: typeof saved.model === 'string' ? saved.model : '', rememberApiKey: saved.rememberApiKey === true };
     } catch { return { base: '', model: '', rememberApiKey: false }; }
   }
+  function loadGmailSettings() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(GMAIL_PREFS_KEY) || '{}');
+      return { clientId: typeof saved.clientId === 'string' ? saved.clientId : '' };
+    } catch { return { clientId: '' }; }
+  }
   function persist() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { showToast('Browser storage is full. Export your drafts to keep a copy.'); }
     updateSummary();
@@ -94,7 +104,7 @@
         <label>Company<input data-field="company" value="${esc(person.company)}" placeholder="Company or team" /></label>
         <label class="wide-field">Why this person? <span style="color:#aab2aa">(optional)</span><textarea data-field="context" placeholder="A shared interest, their work, or where you found them">${esc(person.context)}</textarea></label>
       </div>
-      ${person.subject || person.body ? `<div class="draft-box"><div class="draft-fields"><label>Subject<input data-field="subject" value="${esc(person.subject)}" placeholder="Subject" /></label><label>Message<textarea data-field="body" placeholder="Your note">${esc(person.body)}</textarea></label></div><div class="draft-actions"><button class="small-action" data-action="copy-subject">Copy subject</button><button class="small-action" data-action="copy-body">Copy body</button><button class="small-action" data-action="copy-all">Copy both</button><button class="small-action primary" data-action="compose">Open in Gmail ↗</button></div></div>` : ''}
+      ${person.subject || person.body ? `<div class="draft-box"><div class="draft-fields"><label>Subject<input data-field="subject" value="${esc(person.subject)}" placeholder="Subject" /></label><label>Message<textarea data-field="body" placeholder="Your note">${esc(person.body)}</textarea></label></div><div class="draft-actions"><button class="small-action" data-action="copy-subject">Copy subject</button><button class="small-action" data-action="copy-body">Copy body</button><button class="small-action" data-action="copy-all">Copy both</button><button class="small-action primary" data-action="compose">Open in Gmail ↗</button><button class="small-action" data-action="gmail-draft" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}</div></div>` : ''}
       ${person.error ? `<div class="draft-error">${esc(person.error)}</div>` : ''}
     </article>`).join('');
     updateSummary();
@@ -179,7 +189,7 @@
       const isDue = person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date();
       const status = person.status === 'replied' ? '<span class="status-pill replied">Reply received</span>' : person.status === 'sent' ? `<span class="status-pill ${isDue ? 'due' : ''}">${person.replyCheck === 'no_reply' ? 'No reply yet · check ' : isDue ? 'Follow-up due' : 'Follow up '}${new Date(person.followUpAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : '<span class="status-pill">Draft ready</span>';
       const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>` : `<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>`;
-      const resumeAction = `<button class="small-action" data-action="email-with-resume" data-person="${esc(person.id)}">Download email + resume</button>`;
+      const resumeAction = `<button class="small-action" data-action="email-with-resume" data-person="${esc(person.id)}">Download email + resume</button><button class="small-action primary" data-action="gmail-draft" data-person="${esc(person.id)}" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}`;
       return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.role, person.company].filter(Boolean).join(' · ') || person.email || 'Role not set')}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
   }
@@ -301,6 +311,120 @@
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 5000);
     showToast('Email file with resume downloaded. Open it in your mail app to review and send.');
+  }
+  function renderGmailStatus(message = '') {
+    const connected = Boolean(gmailSession.accessToken && Date.now() < gmailSession.expiresAt);
+    $('#gmailStatus').textContent = message || (connected ? 'Connected for this browser session.' : gmailSettings.clientId ? 'Gmail is not connected. Connect to create an attached draft.' : 'Add your Google OAuth client ID, then connect Gmail.');
+    $('#disconnectGmail').hidden = !connected;
+    $('#connectGmail').textContent = connected ? 'Reconnect Gmail' : 'Connect Gmail';
+  }
+  function saveGmailSettings() {
+    const clientId = $('#gmailClientId').value.trim();
+    if (gmailSettings.clientId && gmailSettings.clientId !== clientId) disconnectGmail();
+    gmailSettings.clientId = clientId;
+    try {
+      localStorage.setItem(GMAIL_PREFS_KEY, JSON.stringify(gmailSettings));
+      renderGmailStatus(gmailSettings.clientId ? 'Gmail settings saved on this device.' : 'Add your Google OAuth client ID, then connect Gmail.');
+      showToast('Gmail settings saved on this device.');
+    } catch {
+      renderGmailStatus('Browser storage could not save Gmail settings.');
+      showToast('Could not save Gmail settings in this browser.');
+    }
+  }
+  function requestGmailAccessToken() {
+    if (!gmailSettings.clientId) return Promise.reject(new Error('Add and save your Google OAuth client ID in My profile first.'));
+    if (!window.google?.accounts?.oauth2) return Promise.reject(new Error('Google sign-in did not load. Check your connection or content blocker, then reload the page.'));
+    return new Promise((resolve, reject) => {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: gmailSettings.clientId,
+        scope: 'https://www.googleapis.com/auth/gmail.compose',
+        callback: response => {
+          if (response.error || !response.access_token) { reject(new Error(response.error_description || response.error || 'Google did not grant Gmail draft access.')); return; }
+          gmailSession = { accessToken: response.access_token, expiresAt: Date.now() + Math.max(60, Number(response.expires_in || 3600) - 60) * 1000 };
+          renderGmailStatus();
+          resolve(gmailSession.accessToken);
+        },
+        error_callback: error => reject(new Error(error.message || 'Google sign-in was closed or blocked.'))
+      });
+      client.requestAccessToken();
+    });
+  }
+  async function gmailAccessToken() {
+    if (gmailSession.accessToken && Date.now() < gmailSession.expiresAt) return gmailSession.accessToken;
+    return requestGmailAccessToken();
+  }
+  async function connectGmail() {
+    saveGmailSettings();
+    if (!gmailSettings.clientId) return;
+    renderGmailStatus('Waiting for Google authorization…');
+    try { await requestGmailAccessToken(); showToast('Gmail connected for this browser session.'); }
+    catch (error) { renderGmailStatus(error.message); showToast(error.message); }
+  }
+  function disconnectGmail() {
+    const oldToken = gmailSession.accessToken;
+    gmailSession = { accessToken: '', expiresAt: 0 };
+    if (oldToken && window.google?.accounts?.oauth2) window.google.accounts.oauth2.revoke(oldToken, () => {});
+    renderGmailStatus('Gmail disconnected.');
+    showToast('Gmail access cleared.');
+  }
+  async function makeGmailRawMessage(person, resume) {
+    const boundary = `goodsend-${crypto.randomUUID()}`;
+    const safeSubject = (person.subject || '').replace(/[\r\n]+/g, ' ');
+    const encodedSubject = bytesToBase64(new TextEncoder().encode(safeSubject));
+    const body = bytesToBase64(new TextEncoder().encode((person.body || '').replace(/\r?\n/g, '\r\n')));
+    const attachment = bytesToBase64(new Uint8Array(await resume.arrayBuffer()));
+    const safeFilename = resume.name.replace(/[\r\n"]/g, '_');
+    const fallbackFilename = safeFilename.replace(/[^\x20-\x7E]/g, '_').replace(/[\\;]/g, '_');
+    const encodedFilename = encodeURIComponent(safeFilename).replace(/['()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+    const mimeType = /^[\w!#$&^_.+-]+\/[\w!#$&^_.+-]+$/.test(resume.type) ? resume.type : 'application/octet-stream';
+    const wrap = value => value.match(/.{1,76}/g)?.join('\r\n') || '';
+    const mime = [
+      `To: ${person.email}`,
+      `Subject: =?UTF-8?B?${encodedSubject}?=`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      wrap(body),
+      `--${boundary}`,
+      `Content-Type: ${mimeType}; name="${fallbackFilename}"; name*=UTF-8\'\'${encodedFilename}`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${fallbackFilename}"; filename*=UTF-8\'\'${encodedFilename}`,
+      '',
+      wrap(attachment),
+      `--${boundary}--`,
+      ''
+    ].join('\r\n');
+    return bytesToBase64(new TextEncoder().encode(mime)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  async function createGmailDraftWithResume(person) {
+    if (!person.email || !validEmail(person.email) || !person.subject || !person.body) { showToast('Add a valid email, subject, and message before creating a Gmail draft.'); return; }
+    if (gmailDrafting.has(person.id)) return;
+    gmailDrafting.add(person.id); renderPeople(); renderOutreach();
+    try {
+      const token = await gmailAccessToken();
+      const resume = await getResumeFile();
+      if (!resume) throw new Error('Add your resume first in My profile.');
+      const raw = await makeGmailRawMessage(person, resume);
+      const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: { raw } })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error?.message || `Gmail returned ${response.status}. Check API access and OAuth setup.`);
+      person.gmailDraftId = result.id;
+      person.gmailDraftCreatedAt = new Date().toISOString();
+      persist(); renderPeople(); renderOutreach();
+      showToast('Gmail draft created with your resume attached. Open it in Gmail to review and send.');
+    } catch (error) {
+      showToast(error.message || 'Could not create a Gmail draft.');
+    } finally {
+      gmailDrafting.delete(person.id); renderPeople(); renderOutreach();
+    }
   }
   function openSettings() {
     $('#apiBase').value = api.base; $('#apiModel').value = api.model; $('#apiKey').value = api.key;
@@ -466,6 +590,7 @@
     if (action === 'copy-all') copyText(`Subject: ${person.subject}\n\n${person.body}`, 'Subject and message');
     if (action === 'compose') compose(person);
     if (action === 'email-with-resume') downloadEmailWithResume(person);
+    if (action === 'gmail-draft') createGmailDraftWithResume(person);
     if (action === 'mark-sent') markSent(person);
     if (action === 'replied') { person.status = 'replied'; person.repliedAt = new Date().toISOString(); persist(); renderPeople(); showToast('Reply recorded. Nice.'); }
     if (action === 'no-reply') { person.replyCheck = 'no_reply'; person.followUpAt = new Date(Date.now() + FOLLOW_UP_DAYS * 86400000).toISOString(); persist(); renderPeople(); showToast('No reply yet. We’ll remind you to check again in two days.'); }
@@ -478,6 +603,9 @@
   updateSidebar();
   renderRoleProfile();
   renderResumeStatus();
+  $('#gmailClientId').value = gmailSettings.clientId;
+  $('#gmailOrigin').textContent = window.location.origin;
+  renderGmailStatus();
   renderWritingStyles();
   updatePage();
   $('#peopleList').addEventListener('input', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (!card || !field) return; const person = personById(card.dataset.person); if (!person) return; person[field] = event.target.value; persist(); if (field === 'name' || field === 'email') renderOutreach(); });
@@ -539,6 +667,9 @@
     try { await deleteResumeFile(); await renderResumeStatus(); showToast('Saved resume removed.'); }
     catch { showToast('Could not remove the saved resume.'); }
   });
+  $('#saveGmailSettings').addEventListener('click', saveGmailSettings);
+  $('#connectGmail').addEventListener('click', connectGmail);
+  $('#disconnectGmail').addEventListener('click', disconnectGmail);
   $('#addWritingStyle').addEventListener('click', () => openWritingStyle());
   $('#writingStylesList').addEventListener('click', event => {
     const button = event.target.closest('[data-style-action]');

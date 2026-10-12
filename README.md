@@ -20,7 +20,9 @@ Each person is drafted with two API calls: the first extracts grounded facts and
 
 The repository includes a GitHub Actions workflow to publish this folder as a Pages site. Push the files to the `main` branch of the `email_automation` repository, then in GitHub open **Settings → Pages** and select **GitHub Actions** as the build and deployment source. The workflow publishes on future pushes to `main`.
 
-GitHub Pages serves the HTML, CSS, and JavaScript; the browser runs the app. That is enough for this version to save your workspace locally, call a model provider directly from your browser, and open or download a prepared message. Your provider must allow browser requests from the site (CORS). The site has no backend, so it cannot safely keep a shared API secret, send messages in the background, or check Gmail for replies on a schedule. The API key stays in the current tab by default, or in this browser's local storage if you explicitly choose the remember option. The follow-up list becomes due after two days when you return; it does not send background notifications. Gmail sending/reply sync would need a backend and explicit account authorization.
+GitHub Pages serves the HTML, CSS, and JavaScript; the browser runs the app. The Gmail draft feature needs a Google Cloud project with Gmail API enabled and a Web application OAuth client. Add the deployed site origin shown on **My profile** to its authorized JavaScript origins, configure the OAuth consent screen, and add your Google account as a test user while the app is in testing. Paste the client ID into **My profile → Resume attachment**, save it, and select **Connect Gmail**. Goodsend requests `gmail.compose`; Google describes this scope as allowing draft management and sending, but Goodsend only calls the draft-creation API. The client ID is saved in this browser and the access token stays in memory for the session. Click **Create Gmail draft + resume** to create a draft containing the recipient, subject, body, and saved resume. Review and send from Gmail yourself. The resume is sent to Gmail only for that explicit action. A static site has no backend for sending messages in the background or checking Gmail replies on a schedule.
+
+The model provider must allow browser requests from the site (CORS). The API key stays in the current tab by default, or in this browser's local storage if you explicitly choose the remember option. The follow-up list becomes due after two days when you return; it does not send background notifications.
 
 ## Data and privacy
 
@@ -37,6 +39,6 @@ GitHub Pages serves the HTML, CSS, and JavaScript; the browser runs the app. Tha
 - Role, company, recipient context, sender profile, and optional writing direction.
 - A separate Writing styles library with Natural and Abigayle framing methods, plus up to 20 editable custom methods. The selected style is applied to single-person and batch drafts.
 - A separate **My profile** page for up to 10 reusable project stories per target role; the writer selects at most one relevant story per email.
-- An optional saved resume and an Outreach action to download the email as an attachment-ready .eml file.
+- An optional saved resume, Gmail OAuth connection, and a Gmail API action to create a reviewable draft with the resume attached; the existing attachment-ready .eml download remains available.
 - Editable subject and body with copy buttons and a prefilled Gmail compose link (recipient, subject, and body).
 - Local outreach tracker with a two-day follow-up date, reply status, and CSV export.
