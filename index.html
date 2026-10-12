@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=draft-archive-1" />
+    <link rel="stylesheet" href="styles.css?v=profile-stories-resume-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -80,17 +80,27 @@
               <label class="field-label">General background or transferable experience<textarea id="senderContext" rows="4" placeholder="Add a short summary of your background, strengths, and interests that apply across roles. Put role specific project stories below."></textarea></label>
             </section>
             <section class="panel role-profile-panel">
-              <div class="section-heading"><div><span class="step">02</span><div><h2>Role specific project stories</h2><p>Save one story per role. Matching details are reused for every contact with that role.</p></div></div><span class="optional-tag" id="roleProfileStatus">SAVED HERE</span></div>
+              <div class="section-heading"><div><span class="step">02</span><div><h2>Role specific project stories</h2><p>Save several stories per role. Goodsend uses the most relevant one for each contact.</p></div></div><button class="outline-button" id="addRoleStory" type="button">＋ Add story</button></div>
               <label class="role-picker-label" for="roleProfileRole">Choose a role profile</label>
               <select id="roleProfileRole" class="role-profile-select" aria-describedby="roleProfileHint"></select>
-              <p class="profile-hint" id="roleProfileHint">Use your own resume details. These fields save automatically in this browser and are added to matching emails.</p>
+              <label class="role-picker-label story-picker-label" for="roleProfileStory">Choose a story <span class="optional-tag" id="roleProfileStatus">SAVED HERE</span></label>
+              <select id="roleProfileStory" class="role-profile-select" aria-describedby="roleProfileHint"></select>
+              <p class="profile-hint" id="roleProfileHint">Add up to 10 stories for each role. Use your own resume details; these save automatically in this browser and are sent to your model only when you generate a matching email.</p>
               <div class="story-fields">
-                <label>What did you build or do?<textarea id="storyBuilt" rows="2" placeholder="Name the project, feature, or contribution."></textarea></label>
-                <label>Why did you build or do it?<textarea id="storyWhy" rows="2" placeholder="What problem, need, or goal led to it?"></textarea></label>
-                <label>How did you build or do it?<textarea id="storyHow" rows="2" placeholder="Your approach, tools, and your own contribution."></textarea></label>
-                <label>What was the result?<textarea id="storyResult" rows="2" placeholder="A measured result, outcome, or what you learned. Leave blank if unknown."></textarea></label>
+                <label>Story name<input id="storyTitle" maxlength="60" placeholder="e.g. Inventory forecasting project" /></label>
+                <label>What did you build or do?<textarea id="storyBuilt" rows="2" maxlength="800" placeholder="Name the project, feature, or contribution."></textarea></label>
+                <label>Why did you build or do it?<textarea id="storyWhy" rows="2" maxlength="800" placeholder="What problem, need, or goal led to it?"></textarea></label>
+                <label>How did you build or do it?<textarea id="storyHow" rows="2" maxlength="800" placeholder="Your approach, tools, and your own contribution."></textarea></label>
+                <label>What was the result?<textarea id="storyResult" rows="2" maxlength="800" placeholder="A measured result, outcome, or what you learned. Leave blank if unknown."></textarea></label>
               </div>
-              <p class="profile-footer-note">Your profiles are stored in this browser. They are sent to your model provider only when you generate a matching email.</p>
+              <div class="story-management"><span id="storyCount">1 / 10 stories for this role</span><button class="text-button" id="deleteRoleStory" type="button">Delete this story</button></div>
+              <p class="profile-footer-note">Your profiles are stored in this browser. Goodsend shares role stories with your model provider only when you generate a matching email.</p>
+            </section>
+            <section class="panel resume-panel">
+              <div class="section-heading"><div><span class="step">03</span><div><h2>Resume attachment</h2><p>Save one resume on this device, then add it to an email draft.</p></div></div><span class="optional-tag">OPTIONAL</span></div>
+              <div class="resume-controls"><label class="resume-upload">Choose resume file<input id="resumeFile" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /></label><button class="text-button" id="removeResume" type="button" hidden>Remove saved resume</button></div>
+              <p id="resumeStatus" class="profile-hint" role="status">No resume saved.</p>
+              <p class="profile-footer-note">The resume stays in this browser and is never sent to the writing model. Use “Download email + resume” in Outreach to create an attachment-ready .eml file. Some mail apps may ask you to open or import the file; the regular email button still works if you prefer to attach it yourself.</p>
             </section>
           </div>
         </section>
@@ -105,6 +115,6 @@
     <dialog id="settingsDialog" class="settings-dialog"><form method="dialog" id="settingsForm"><div class="dialog-head"><div><span class="step">SETUP</span><h2>Connect your writing model</h2><p>Use an OpenAI-compatible chat completions API. Choose whether to remember your key in this browser.</p></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>API base URL<input id="apiBase" type="url" placeholder="https://api.openai.com/v1" /></label><label>Model<input id="apiModel" placeholder="e.g. gpt-4o-mini" /></label><label>API key<input id="apiKey" type="password" autocomplete="off" placeholder="Paste your own API key" /></label><label class="remember-key-option"><input id="rememberApiKey" type="checkbox" /><span><strong>Remember API key on this device</strong><small>Keep it available after reloading or reopening this page.</small></span></label><div class="security-hint"><span>◉</span><span>When selected, the key is saved in this browser’s local storage. Anyone with access to this browser profile or scripts running on this site could access it. Leave unchecked on shared devices. Uncheck and save to remove the remembered key.</span></div><div class="dialog-actions"><button class="text-button" id="testApi" type="button">Test connection</button><span id="testStatus" class="test-status"></span><button class="outline-button" id="saveApi" type="button">Save settings</button></div><p class="dialog-foot">GitHub Pages hosts this interface only. Never paste a shared or production secret here. Your provider may require browser CORS access.</p></form></dialog>
     <dialog id="styleDialog" class="settings-dialog style-dialog"><form method="dialog" id="styleForm"><div class="dialog-head"><div><span class="step">CUSTOM METHOD</span><h2 id="styleDialogTitle">Add a writing method</h2><p>Describe the structure or voice you want the model to use. Your saved profile provides the facts.</p></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>Method name<input id="styleName" maxlength="40" placeholder="e.g. Curious builder" required /></label><label>Writing instructions<textarea id="styleInstructions" rows="6" maxlength="700" placeholder="For each project sentence, state what I built, why it mattered, how I approached it, and the result. Keep it natural and specific. Never invent details." required></textarea></label><p class="dialog-foot">Keep instructions focused on tone, structure, and length. Do not add personal facts here; save those in My profile.</p><div class="dialog-actions"><button class="text-button" id="cancelStyle" type="button">Cancel</button><button class="outline-button" id="saveStyle" type="button">Save method</button></div></form></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=draft-archive-1"></script>
+    <script src="script.js?v=profile-stories-resume-2"></script>
   </body>
 </html>

@@ -2,12 +2,14 @@
   const STORE_KEY = 'goodsend.workspace.v1';
   const API_PREFS_KEY = 'goodsend.api.preferences.v1';
   const API_KEY_KEY = 'goodsend.api.key.v1';
+  const RESUME_DB_NAME = 'goodsend.local.assets.v1';
   const MAX_PEOPLE = 25;
+  const MAX_STORIES_PER_ROLE = 10;
   const FOLLOW_UP_DAYS = 2;
   const roles = ['Software engineer', 'Frontend engineer', 'Backend engineer', 'Data / ML', 'Product', 'Design', 'Research', 'Marketing', 'Operations', 'Founder / executive', 'Other'];
   const builtInStyles = [
     { id: 'natural', name: 'Natural', description: 'Warm, clear, and conversational.', instructions: 'Write in a natural first-person style. Keep sentences clear and conversational, and use only supplied details.' },
-    { id: 'abigayle', name: 'Abigayle framing', description: 'Tell a project story through what, why, how, and result.', instructions: 'When using the role profile project, shape its project sentence in this order: what I built or did → why I did it → how I did it → result. Make the sequence sound natural and specific. Use only the supplied fields. If the result is blank, do not invent one; omit it or describe only a supplied qualitative outcome. Do not force this structure onto unrelated sentences.' }
+    { id: 'abigayle', name: 'Abigayle framing', description: 'Tell a project story through what, why, how, and result.', instructions: 'For the single role profile story you chose, shape its project sentence in this order: what I built or did → why I did it → how I did it → result. Make the sequence sound natural and specific. Use only the supplied fields. If the result is blank, do not invent one; omit it or describe only a supplied qualitative outcome. Do not force this structure onto unrelated sentences.' }
   ];
   const $ = (selector, root = document) => root.querySelector(selector);
   const newPerson = () => ({ id: crypto.randomUUID(), name: '', email: '', role: '', company: '', context: '', subject: '', body: '', status: 'draft', sentAt: null, followUpAt: null, repliedAt: null });
@@ -28,12 +30,19 @@
       const writingStyles = normalizeWritingStyles(saved.writingStyles);
       const requestedStyleId = saved.selectedStyleId || (saved.abigayleMode ? 'abigayle' : 'natural');
       const selectedStyleId = [...builtInStyles, ...writingStyles].some(style => style.id === requestedStyleId) ? requestedStyleId : 'natural';
+      const roleProfiles = normalizeRoleProfiles(saved.roleProfiles);
+      const roleProfileEditorRole = roles.includes(saved.roleProfileEditorRole) ? saved.roleProfileEditorRole : roles[0];
+      const editorStories = roleProfiles[roleProfileEditorRole];
+      const roleProfileEditorStoryId = editorStories.some(story => story.id === saved.roleProfileEditorStoryId) ? saved.roleProfileEditorStoryId : editorStories[0].id;
       const people = Array.isArray(saved.people) ? saved.people.slice(0, MAX_PEOPLE) : [];
       const priorOutreach = Array.isArray(saved.outreach) ? saved.outreach : [];
       const archivedPeople = people.filter(person => person.subject || person.body || person.status !== 'draft');
       const composePeople = people.filter(person => !person.subject && !person.body && person.status === 'draft');
-      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', roleProfiles: normalizeRoleProfiles(saved.roleProfiles), roleProfileEditorRole: roles.includes(saved.roleProfileEditorRole) ? saved.roleProfileEditorRole : roles[0], writingStyles, selectedStyleId, people: composePeople.length ? composePeople : [newPerson()], outreach: [...archivedPeople, ...priorOutreach] };
-    } catch { return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; }
+      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', roleProfiles, roleProfileEditorRole, roleProfileEditorStoryId, writingStyles, selectedStyleId, people: composePeople.length ? composePeople : [newPerson()], outreach: [...archivedPeople, ...priorOutreach] };
+    } catch {
+      const roleProfiles = normalizeRoleProfiles({});
+      return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles, roleProfileEditorRole: roles[0], roleProfileEditorStoryId: roleProfiles[roles[0]][0].id, writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] };
+    }
   }
   function normalizeWritingStyles(styles) {
     if (!Array.isArray(styles)) return [];
@@ -43,11 +52,23 @@
   function getWritingStyle(id = state.selectedStyleId) {
     return [...builtInStyles, ...state.writingStyles].find(style => style.id === id) || builtInStyles[0];
   }
+  function newRoleStory() {
+    return { id: crypto.randomUUID(), title: '', built: '', why: '', how: '', result: '' };
+  }
   function normalizeRoleProfiles(profiles) {
-    if (!profiles || typeof profiles !== 'object' || Array.isArray(profiles)) return {};
+    if (!profiles || typeof profiles !== 'object' || Array.isArray(profiles)) profiles = {};
     return Object.fromEntries(roles.map(role => {
-      const profile = profiles[role] && typeof profiles[role] === 'object' ? profiles[role] : {};
-      return [role, { built: typeof profile.built === 'string' ? profile.built : '', why: typeof profile.why === 'string' ? profile.why : '', how: typeof profile.how === 'string' ? profile.how : '', result: typeof profile.result === 'string' ? profile.result : '' }];
+      const savedRole = profiles[role];
+      const entries = Array.isArray(savedRole) ? savedRole : savedRole && typeof savedRole === 'object' ? [savedRole] : [];
+      const stories = entries.slice(0, MAX_STORIES_PER_ROLE).map(story => ({
+        id: typeof story.id === 'string' && story.id ? story.id : crypto.randomUUID(),
+        title: typeof story.title === 'string' ? story.title.slice(0, 60) : '',
+        built: typeof story.built === 'string' ? story.built.slice(0, 800) : '',
+        why: typeof story.why === 'string' ? story.why.slice(0, 800) : '',
+        how: typeof story.how === 'string' ? story.how.slice(0, 800) : '',
+        result: typeof story.result === 'string' ? story.result.slice(0, 800) : ''
+      }));
+      return [role, stories.length ? stories : [newRoleStory()]];
     }));
   }
   function loadApiPreferences() {
@@ -79,13 +100,20 @@
     updateSummary();
   }
   function renderRoleProfile() {
-    const picker = $('#roleProfileRole');
-    picker.innerHTML = roles.map(role => `<option value="${esc(role)}">${esc(role)}</option>`).join('');
-    picker.value = state.roleProfileEditorRole;
-    const profile = state.roleProfiles[state.roleProfileEditorRole] || { built: '', why: '', how: '', result: '' };
-    for (const field of ['built', 'why', 'how', 'result']) $(`#story${field[0].toUpperCase()}${field.slice(1)}`).value = profile[field];
-    const hasDetails = Object.values(profile).some(value => value.trim());
-    $('#roleProfileStatus').textContent = hasDetails ? 'PROFILE SAVED' : 'READY TO ADD';
+    const rolePicker = $('#roleProfileRole');
+    rolePicker.innerHTML = roles.map(role => `<option value="${esc(role)}">${esc(role)}</option>`).join('');
+    rolePicker.value = state.roleProfileEditorRole;
+    const stories = state.roleProfiles[state.roleProfileEditorRole];
+    if (!stories.some(story => story.id === state.roleProfileEditorStoryId)) state.roleProfileEditorStoryId = stories[0].id;
+    $('#roleProfileStory').innerHTML = stories.map((story, index) => `<option value="${esc(story.id)}">${esc(story.title.trim() || `Story ${index + 1}`)}</option>`).join('');
+    $('#roleProfileStory').value = state.roleProfileEditorStoryId;
+    const story = stories.find(item => item.id === state.roleProfileEditorStoryId) || stories[0];
+    for (const field of ['title', 'built', 'why', 'how', 'result']) $(`#story${field[0].toUpperCase()}${field.slice(1)}`).value = story[field];
+    const hasDetails = stories.some(item => [item.title, item.built, item.why, item.how, item.result].some(value => value.trim()));
+    $('#roleProfileStatus').textContent = hasDetails ? 'SAVED HERE' : 'READY TO ADD';
+    $('#storyCount').textContent = `${stories.length} / ${MAX_STORIES_PER_ROLE} stories for this role`;
+    $('#addRoleStory').disabled = stories.length >= MAX_STORIES_PER_ROLE;
+    $('#deleteRoleStory').textContent = stories.length === 1 ? 'Clear this story' : 'Delete this story';
   }
   function renderWritingStyles() {
     const active = getWritingStyle();
@@ -151,7 +179,8 @@
       const isDue = person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date();
       const status = person.status === 'replied' ? '<span class="status-pill replied">Reply received</span>' : person.status === 'sent' ? `<span class="status-pill ${isDue ? 'due' : ''}">${person.replyCheck === 'no_reply' ? 'No reply yet · check ' : isDue ? 'Follow-up due' : 'Follow up '}${new Date(person.followUpAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : '<span class="status-pill">Draft ready</span>';
       const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open email ↗</button>` : `<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open email ↗</button>`;
-      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.role, person.company].filter(Boolean).join(' · ') || person.email || 'Role not set')}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
+      const resumeAction = `<button class="small-action" data-action="email-with-resume" data-person="${esc(person.id)}">Download email + resume</button>`;
+      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.role, person.company].filter(Boolean).join(' · ') || person.email || 'Role not set')}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
   }
   function showToast(message) {
@@ -170,6 +199,109 @@
     if (!state.people.length) state.people.push(newPerson());
   }
   function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+  function openResumeDatabase() {
+    return new Promise((resolve, reject) => {
+      if (!('indexedDB' in window)) { reject(new Error('This browser does not support local resume storage.')); return; }
+      const request = indexedDB.open(RESUME_DB_NAME, 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('assets');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('Could not open browser file storage.'));
+    });
+  }
+  async function saveResumeFile(file) {
+    const db = await openResumeDatabase();
+    try {
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction('assets', 'readwrite');
+        transaction.objectStore('assets').put(file, 'resume');
+        transaction.oncomplete = resolve;
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error || new Error('Resume save was cancelled.'));
+      });
+    } finally { db.close(); }
+  }
+  async function getResumeFile() {
+    const db = await openResumeDatabase();
+    try {
+      return await new Promise((resolve, reject) => {
+        const request = db.transaction('assets', 'readonly').objectStore('assets').get('resume');
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+      });
+    } finally { db.close(); }
+  }
+  async function deleteResumeFile() {
+    const db = await openResumeDatabase();
+    try {
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction('assets', 'readwrite');
+        transaction.objectStore('assets').delete('resume');
+        transaction.oncomplete = resolve;
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error || new Error('Resume removal was cancelled.'));
+      });
+    } finally { db.close(); }
+  }
+  async function renderResumeStatus() {
+    try {
+      const file = await getResumeFile();
+      $('#resumeStatus').textContent = file ? `Saved on this device: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB).` : 'No resume saved.';
+      $('#removeResume').hidden = !file;
+    } catch {
+      $('#resumeStatus').textContent = 'Resume storage is unavailable in this browser.';
+      $('#removeResume').hidden = true;
+    }
+  }
+  function bytesToBase64(bytes) {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let index = 0; index < bytes.length; index += chunkSize) binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+    return btoa(binary);
+  }
+  async function downloadEmailWithResume(person) {
+    if (!person.email || !person.subject || !person.body) { showToast('This saved email is missing its address or message.'); return; }
+    let resume;
+    try { resume = await getResumeFile(); }
+    catch { showToast('Could not read the saved resume from this browser.'); return; }
+    if (!resume) { showToast('Add your resume first in My profile.'); return; }
+    const boundary = `goodsend-${crypto.randomUUID()}`;
+    const subject = bytesToBase64(new TextEncoder().encode(person.subject));
+    const body = bytesToBase64(new TextEncoder().encode(person.body.replace(/\r?\n/g, '\r\n')));
+    const attachment = bytesToBase64(new Uint8Array(await resume.arrayBuffer()));
+    const safeFilename = resume.name.replace(/[\r\n"]/g, '_');
+    const fallbackFilename = safeFilename.replace(/[^\x20-\x7E]/g, '_').replace(/[\\;]/g, '_');
+    const encodedFilename = encodeURIComponent(safeFilename).replace(/['()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+    const mimeType = /^[\w!#$&^_.+-]+\/[\w!#$&^_.+-]+$/.test(resume.type) ? resume.type : 'application/octet-stream';
+    const wrap = value => value.match(/.{1,76}/g)?.join('\r\n') || '';
+    const eml = [
+      `To: ${person.email}`,
+      `Subject: =?UTF-8?B?${subject}?=`,
+      'X-Unsent: 1',
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      wrap(body),
+      `--${boundary}`,
+      `Content-Type: ${mimeType}; name="${fallbackFilename}"; name*=UTF-8''${encodedFilename}`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${fallbackFilename}"; filename*=UTF-8''${encodedFilename}`,
+      '',
+      wrap(attachment),
+      `--${boundary}--`,
+      ''
+    ].join('\r\n');
+    const link = document.createElement('a');
+    const safeName = (person.name || 'outreach').normalize('NFKD').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'outreach';
+    link.href = URL.createObjectURL(new Blob([eml], { type: 'message/rfc822' }));
+    link.download = `${safeName}-email.eml`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+    showToast('Email file with resume downloaded. Open it in your mail app to review and send.');
+  }
   function openSettings() {
     $('#apiBase').value = api.base; $('#apiModel').value = api.model; $('#apiKey').value = api.key;
     $('#rememberApiKey').checked = api.rememberApiKey;
@@ -244,7 +376,7 @@
     else window.scrollTo({ top: 0, behavior: 'auto' });
   }
   function buildContext(person) {
-    const roleProfile = person.role ? (state.roleProfiles[person.role] || { built: '', why: '', how: '', result: '' }) : { built: '', why: '', how: '', result: '' };
+    const roleProfile = person.role ? (state.roleProfiles[person.role] || []).filter(story => [story.title, story.built, story.why, story.how, story.result].some(value => value.trim())) : [];
     return {
       senderName: state.senderName.trim(), senderFocus: state.senderFocus.trim(), senderExperience: state.senderContext.trim(),
       roleProfile, framingStyle: state.selectedStyleId || 'natural',
@@ -253,10 +385,10 @@
   }
   async function generatePerson(person) {
     const context = buildContext(person);
-    const factPrompt = `You are a careful outreach writing assistant. Use only the information below. Return a short grounded fact sheet of useful facts and a separate list of anything that must not be claimed. Do not infer achievements, relationships, company facts, or experience. Missing information must stay missing. Keep the facts concise.\n\n${JSON.stringify(context)}`;
-    const facts = await requestCompletion([{ role: 'system', content: 'Extract grounded facts for a personal cold email. Never invent facts.' }, { role: 'user', content: factPrompt }], 0.2);
+    const factPrompt = `You are a careful outreach writing assistant. Use only the information below. Return a short grounded fact sheet and a separate list of anything that must not be claimed. Keep separate project stories distinct; do not combine their facts. Do not infer achievements, relationships, company facts, or experience. Missing information must stay missing.\n\n${JSON.stringify(context)}`;
+    const facts = await requestCompletion([{ role: 'system', content: 'Extract grounded facts for a personal cold email. Keep each project story separate and never invent facts.' }, { role: 'user', content: factPrompt }], 0.2);
     const styleInstruction = getWritingStyle(context.framingStyle).instructions;
-    const draftPrompt = `Write one concise, warm, human cold outreach email based only on this context and fact sheet. Avoid generic flattery, fake familiarity, exaggerated claims, and salesy language. Use a natural greeting and one small, clear ask. Aim for 75–125 words unless the optional direction says otherwise. ${styleInstruction} Return ONLY valid JSON with exactly two string fields: subject and body. No markdown fences.\n\nContext: ${JSON.stringify(context)}\nGrounded fact sheet: ${facts}`;
+    const draftPrompt = `Write one concise, warm, human cold outreach email based only on this context and fact sheet. Choose at most one role-specific project story, selecting the one most relevant to this contact's role and context. Do not merge separate projects or try to include every story. Avoid generic flattery, fake familiarity, exaggerated claims, and salesy language. Use a natural greeting and one small, clear ask. Aim for 75–125 words unless the optional direction says otherwise. ${styleInstruction} Return ONLY valid JSON with exactly two string fields: subject and body. No markdown fences.\n\nContext: ${JSON.stringify(context)}\nGrounded fact sheet: ${facts}`;
     const raw = await requestCompletion([{ role: 'system', content: 'You write thoughtful, specific outreach emails that sound like a real person. Follow the required JSON format.' }, { role: 'user', content: draftPrompt }], 0.75);
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     let result;
@@ -328,6 +460,7 @@
     if (action === 'copy-body') copyText(person.body, 'Message');
     if (action === 'copy-all') copyText(`Subject: ${person.subject}\n\n${person.body}`, 'Subject and message');
     if (action === 'compose') compose(person);
+    if (action === 'email-with-resume') downloadEmailWithResume(person);
     if (action === 'mark-sent') markSent(person);
     if (action === 'replied') { person.status = 'replied'; person.repliedAt = new Date().toISOString(); persist(); renderPeople(); showToast('Reply recorded. Nice.'); }
     if (action === 'no-reply') { person.replyCheck = 'no_reply'; person.followUpAt = new Date(Date.now() + FOLLOW_UP_DAYS * 86400000).toISOString(); persist(); renderPeople(); showToast('No reply yet. We’ll remind you to check again in two days.'); }
@@ -339,6 +472,7 @@
   setApiStatus();
   updateSidebar();
   renderRoleProfile();
+  renderResumeStatus();
   renderWritingStyles();
   updatePage();
   $('#peopleList').addEventListener('input', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (!card || !field) return; const person = personById(card.dataset.person); if (!person) return; person[field] = event.target.value; persist(); if (field === 'name' || field === 'email') renderOutreach(); });
@@ -348,11 +482,57 @@
   $('#addPerson').addEventListener('click', () => { if (state.people.length >= MAX_PEOPLE) return; state.people.push(newPerson()); persist(); renderPeople(); $('#peopleList article:last-child [data-field="name"]').focus(); });
   for (const [id, key] of [['senderName','senderName'], ['senderFocus','senderFocus'], ['senderContext','senderContext']]) $(`#${id}`).addEventListener('input', event => { state[key] = event.target.value; persist(); });
   $('#customPrompt').addEventListener('input', event => { state.customPrompt = event.target.value.slice(0, 500); if (event.target.value.length > 500) event.target.value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; persist(); });
-  $('#roleProfileRole').addEventListener('change', event => { state.roleProfileEditorRole = event.target.value; persist(); renderRoleProfile(); });
-  for (const field of ['built', 'why', 'how', 'result']) $(`#story${field[0].toUpperCase()}${field.slice(1)}`).addEventListener('input', event => {
-    const profile = state.roleProfiles[state.roleProfileEditorRole] || { built: '', why: '', how: '', result: '' };
-    profile[field] = event.target.value; state.roleProfiles[state.roleProfileEditorRole] = profile; persist();
-    const hasDetails = Object.values(profile).some(value => value.trim()); $('#roleProfileStatus').textContent = hasDetails ? 'PROFILE SAVED' : 'READY TO ADD';
+  $('#roleProfileRole').addEventListener('change', event => {
+    state.roleProfileEditorRole = event.target.value;
+    state.roleProfileEditorStoryId = state.roleProfiles[state.roleProfileEditorRole][0].id;
+    persist(); renderRoleProfile();
+  });
+  $('#roleProfileStory').addEventListener('change', event => { state.roleProfileEditorStoryId = event.target.value; persist(); renderRoleProfile(); });
+  $('#addRoleStory').addEventListener('click', () => {
+    const stories = state.roleProfiles[state.roleProfileEditorRole];
+    if (stories.length >= MAX_STORIES_PER_ROLE) return;
+    const story = newRoleStory(); stories.push(story); state.roleProfileEditorStoryId = story.id;
+    persist(); renderRoleProfile(); $('#storyTitle').focus();
+  });
+  $('#deleteRoleStory').addEventListener('click', () => {
+    const stories = state.roleProfiles[state.roleProfileEditorRole];
+    if (stories.length === 1) {
+      Object.assign(stories[0], { title: '', built: '', why: '', how: '', result: '' });
+      showToast('Story cleared.');
+    } else {
+      state.roleProfiles[state.roleProfileEditorRole] = stories.filter(story => story.id !== state.roleProfileEditorStoryId);
+      state.roleProfileEditorStoryId = state.roleProfiles[state.roleProfileEditorRole][0].id;
+      showToast('Story deleted.');
+    }
+    persist(); renderRoleProfile();
+  });
+  for (const field of ['title', 'built', 'why', 'how', 'result']) $(`#story${field[0].toUpperCase()}${field.slice(1)}`).addEventListener('input', event => {
+    const stories = state.roleProfiles[state.roleProfileEditorRole];
+    const story = stories.find(item => item.id === state.roleProfileEditorStoryId);
+    if (!story) return;
+    const maxLength = field === 'title' ? 60 : 800;
+    story[field] = event.target.value.slice(0, maxLength);
+    if (event.target.value.length > maxLength) event.target.value = story[field];
+    const index = stories.indexOf(story);
+    $('#roleProfileStory').options[index].textContent = story.title.trim() || `Story ${index + 1}`;
+    $('#roleProfileStatus').textContent = stories.some(item => [item.title, item.built, item.why, item.how, item.result].some(value => value.trim())) ? 'SAVED HERE' : 'READY TO ADD';
+    persist();
+  });
+  $('#resumeFile').addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!/\.(pdf|doc|docx)$/i.test(file.name)) { showToast('Choose a PDF, DOC, or DOCX resume.'); event.target.value = ''; return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('Keep your resume under 10 MB.'); event.target.value = ''; return; }
+    try {
+      await saveResumeFile(file); await renderResumeStatus(); showToast('Resume saved on this device.');
+    } catch (error) {
+      showToast(error.message || 'Could not save the resume in this browser.');
+    }
+    event.target.value = '';
+  });
+  $('#removeResume').addEventListener('click', async () => {
+    try { await deleteResumeFile(); await renderResumeStatus(); showToast('Saved resume removed.'); }
+    catch { showToast('Could not remove the saved resume.'); }
   });
   $('#addWritingStyle').addEventListener('click', () => openWritingStyle());
   $('#writingStylesList').addEventListener('click', event => {
@@ -380,5 +560,5 @@
   window.addEventListener('hashchange', updatePage);
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv);
-  $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, profile, and follow-up from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderRoleProfile(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
+  $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, profile, follow-up, and saved resume from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); deleteResumeFile().then(renderResumeStatus).catch(() => {}); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: normalizeRoleProfiles({}), roleProfileEditorRole: roles[0], roleProfileEditorStoryId: '', writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; state.roleProfileEditorStoryId = state.roleProfiles[roles[0]][0].id; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderRoleProfile(); renderResumeStatus(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
 })();
