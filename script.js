@@ -94,7 +94,7 @@
         <label>Company<input data-field="company" value="${esc(person.company)}" placeholder="Company or team" /></label>
         <label class="wide-field">Why this person? <span style="color:#aab2aa">(optional)</span><textarea data-field="context" placeholder="A shared interest, their work, or where you found them">${esc(person.context)}</textarea></label>
       </div>
-      ${person.subject || person.body ? `<div class="draft-box"><div class="draft-fields"><label>Subject<input data-field="subject" value="${esc(person.subject)}" placeholder="Subject" /></label><label>Message<textarea data-field="body" placeholder="Your note">${esc(person.body)}</textarea></label></div><div class="draft-actions"><button class="small-action" data-action="copy-subject">Copy subject</button><button class="small-action" data-action="copy-body">Copy body</button><button class="small-action" data-action="copy-all">Copy both</button><button class="small-action primary" data-action="compose">Open email app ↗</button></div></div>` : ''}
+      ${person.subject || person.body ? `<div class="draft-box"><div class="draft-fields"><label>Subject<input data-field="subject" value="${esc(person.subject)}" placeholder="Subject" /></label><label>Message<textarea data-field="body" placeholder="Your note">${esc(person.body)}</textarea></label></div><div class="draft-actions"><button class="small-action" data-action="copy-subject">Copy subject</button><button class="small-action" data-action="copy-body">Copy body</button><button class="small-action" data-action="copy-all">Copy both</button><button class="small-action primary" data-action="compose">Open in Gmail ↗</button></div></div>` : ''}
       ${person.error ? `<div class="draft-error">${esc(person.error)}</div>` : ''}
     </article>`).join('');
     updateSummary();
@@ -178,7 +178,7 @@
     $('#outreachList').innerHTML = items.map(person => {
       const isDue = person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date();
       const status = person.status === 'replied' ? '<span class="status-pill replied">Reply received</span>' : person.status === 'sent' ? `<span class="status-pill ${isDue ? 'due' : ''}">${person.replyCheck === 'no_reply' ? 'No reply yet · check ' : isDue ? 'Follow-up due' : 'Follow up '}${new Date(person.followUpAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : '<span class="status-pill">Draft ready</span>';
-      const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open email ↗</button>` : `<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open email ↗</button>`;
+      const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>` : `<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>`;
       const resumeAction = `<button class="small-action" data-action="email-with-resume" data-person="${esc(person.id)}">Download email + resume</button>`;
       return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.role, person.company].filter(Boolean).join(' · ') || person.email || 'Role not set')}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
@@ -437,8 +437,13 @@
     catch { showToast('Clipboard access is unavailable. Select and copy the text instead.'); }
   }
   function compose(person) {
-    const to = encodeURIComponent(person.email || ''); const subject = encodeURIComponent(person.subject || ''); const body = encodeURIComponent(person.body || '');
-    window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+    const gmail = new URL('https://mail.google.com/mail/');
+    gmail.searchParams.set('view', 'cm');
+    gmail.searchParams.set('fs', '1');
+    gmail.searchParams.set('to', person.email || '');
+    gmail.searchParams.set('su', person.subject || '');
+    gmail.searchParams.set('body', person.body || '');
+    window.open(gmail.toString(), '_blank', 'noopener,noreferrer');
   }
   function markSent(person) {
     if (!person.email || !validEmail(person.email)) { showToast('Add a valid email before marking this note sent.'); return; }

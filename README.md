@@ -14,7 +14,7 @@ To connect a writing model, open **API settings** and enter:
 
 Use **Test connection**, then **Save settings**. By default, the key remains in JavaScript memory for the current tab and clears on reload. To keep from entering it again, select **Remember API key on this device** before saving; the key is then stored in this browser's local storage. Anyone using this browser profile or scripts running on the site could access a remembered key, so leave the option off on shared devices and use a personal key with suitable limits. The key is never written into this repository. Some providers block browser requests unless they enable CORS.
 
-Each person is drafted with two API calls: the first extracts grounded facts and missing-information constraints; the second writes a subject and body. The app processes contacts one at a time and never sends an email automatically. After a successful draft, its contact entry clears from Compose and the complete message is saved under **Outreach** for later review, copying, or opening in your email app. Generated drafts and contact/profile information are stored in the browser's local storage. Use **Export list** to save a CSV backup.
+Each person is drafted with two API calls: the first extracts grounded facts and missing-information constraints; the second writes a subject and body. The app processes contacts one at a time and never sends an email automatically. After a successful draft, its contact entry clears from Compose and the complete message is saved under **Outreach** for later review, copying, or opening in a prefilled Gmail compose window. Generated drafts and contact/profile information are stored in the browser's local storage. Use **Export list** to save a CSV backup.
 
 ## GitHub Pages
 
@@ -38,5 +38,5 @@ GitHub Pages serves the HTML, CSS, and JavaScript; the browser runs the app. Tha
 - A separate Writing styles library with Natural and Abigayle framing methods, plus up to 20 editable custom methods. The selected style is applied to single-person and batch drafts.
 - A separate **My profile** page for up to 10 reusable project stories per target role; the writer selects at most one relevant story per email.
 - An optional saved resume and an Outreach action to download the email as an attachment-ready .eml file.
-- Editable subject and body with copy buttons and `mailto:` handoff.
+- Editable subject and body with copy buttons and a prefilled Gmail compose link (recipient, subject, and body).
 - Local outreach tracker with a two-day follow-up date, reply status, and CSV export.
