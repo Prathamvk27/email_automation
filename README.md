@@ -26,7 +26,7 @@ GitHub Pages is static hosting. The site cannot safely keep a shared API secret,
 
 - Contacts, profile notes, prompts, and drafts stay in this browser's local storage until cleared.
 - API keys are held only in the current page's memory and are discarded on reload/close.
-- When you generate a draft or test the connection, the relevant profile and recipient details are sent to the API endpoint you configured. Review that provider's data handling terms.
+- When you generate a draft, the sender profile, recipient name/role/company/context, and custom direction are sent to the API endpoint you configured. The recipient email address stays in this browser and is not sent to the model. Review the provider's data handling terms before adding resume details.
 - Do not put secrets in the source code or commit an API key.
 
 ## Features

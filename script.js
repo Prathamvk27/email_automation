@@ -105,7 +105,7 @@
   function buildContext(person) {
     return {
       senderName: state.senderName.trim(), senderFocus: state.senderFocus.trim(), senderExperience: state.senderContext.trim(),
-      recipientName: person.name.trim(), recipientEmail: person.email.trim(), targetRole: person.role, company: person.company.trim(), recipientContext: person.context.trim(), customDirection: state.customPrompt.trim()
+      recipientName: person.name.trim(), targetRole: person.role, company: person.company.trim(), recipientContext: person.context.trim(), customDirection: state.customPrompt.trim()
     };
   }
   async function generatePerson(person) {
