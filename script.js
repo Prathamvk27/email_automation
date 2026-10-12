@@ -5,6 +5,10 @@
   const MAX_PEOPLE = 25;
   const FOLLOW_UP_DAYS = 2;
   const roles = ['Software engineer', 'Frontend engineer', 'Backend engineer', 'Data / ML', 'Product', 'Design', 'Research', 'Marketing', 'Operations', 'Founder / executive', 'Other'];
+  const builtInStyles = [
+    { id: 'natural', name: 'Natural', description: 'Warm, clear, and conversational.', instructions: 'Write in a natural first-person style. Keep sentences clear and conversational, and use only supplied details.' },
+    { id: 'abigayle', name: 'Abigayle framing', description: 'Tell a project story through what, why, how, and result.', instructions: 'When using the role profile project, shape its project sentence in this order: what I built or did → why I did it → how I did it → result. Make the sequence sound natural and specific. Use only the supplied fields. If the result is blank, do not invent one; omit it or describe only a supplied qualitative outcome. Do not force this structure onto unrelated sentences.' }
+  ];
   const $ = (selector, root = document) => root.querySelector(selector);
   const newPerson = () => ({ id: crypto.randomUUID(), name: '', email: '', role: '', company: '', context: '', subject: '', body: '', status: 'draft', sentAt: null, followUpAt: null, repliedAt: null });
   let state = loadState();
@@ -15,13 +19,25 @@
   const mobileSidebar = window.matchMedia('(max-width: 790px)');
   const generatingPeople = new Set();
   let generatingAll = false;
+  let editingStyleId = null;
   let toastTimer;
 
   function loadState() {
     try {
       const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', roleProfiles: normalizeRoleProfiles(saved.roleProfiles), roleProfileEditorRole: roles.includes(saved.roleProfileEditorRole) ? saved.roleProfileEditorRole : roles[0], abigayleMode: Boolean(saved.abigayleMode), people: Array.isArray(saved.people) && saved.people.length ? saved.people.slice(0, MAX_PEOPLE) : [newPerson()] };
-    } catch { return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], abigayleMode: false, people: [newPerson()] }; }
+      const writingStyles = normalizeWritingStyles(saved.writingStyles);
+      const requestedStyleId = saved.selectedStyleId || (saved.abigayleMode ? 'abigayle' : 'natural');
+      const selectedStyleId = [...builtInStyles, ...writingStyles].some(style => style.id === requestedStyleId) ? requestedStyleId : 'natural';
+      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', roleProfiles: normalizeRoleProfiles(saved.roleProfiles), roleProfileEditorRole: roles.includes(saved.roleProfileEditorRole) ? saved.roleProfileEditorRole : roles[0], writingStyles, selectedStyleId, people: Array.isArray(saved.people) && saved.people.length ? saved.people.slice(0, MAX_PEOPLE) : [newPerson()] };
+    } catch { return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], writingStyles: [], selectedStyleId: 'natural', people: [newPerson()] }; }
+  }
+  function normalizeWritingStyles(styles) {
+    if (!Array.isArray(styles)) return [];
+    return styles.filter(style => style && typeof style.id === 'string' && style.id.startsWith('custom-') && typeof style.name === 'string' && typeof style.instructions === 'string')
+      .slice(0, 20).map(style => ({ id: style.id, name: style.name.trim().slice(0, 40) || 'Custom method', instructions: style.instructions.trim().slice(0, 700), description: 'A personal writing method.' }));
+  }
+  function getWritingStyle(id = state.selectedStyleId) {
+    return [...builtInStyles, ...state.writingStyles].find(style => style.id === id) || builtInStyles[0];
   }
   function normalizeRoleProfiles(profiles) {
     if (!profiles || typeof profiles !== 'object' || Array.isArray(profiles)) return {};
@@ -67,11 +83,40 @@
     const hasDetails = Object.values(profile).some(value => value.trim());
     $('#roleProfileStatus').textContent = hasDetails ? 'PROFILE SAVED' : 'READY TO ADD';
   }
-  function renderAbigayleStyle() {
-    const button = $('#abigayleStyle');
-    button.setAttribute('aria-pressed', String(state.abigayleMode));
-    button.classList.toggle('selected', state.abigayleMode);
-    $('#abigayleState').textContent = state.abigayleMode ? 'On' : 'Off';
+  function renderWritingStyles() {
+    const active = getWritingStyle();
+    $('#activeStyleName').textContent = active.name;
+    $('#activeStyleDescription').textContent = active.description;
+    $('#writingStylesList').innerHTML = [...builtInStyles, ...state.writingStyles].map(style => {
+      const selected = state.selectedStyleId === style.id;
+      const custom = style.id.startsWith('custom-');
+      return `<article class="style-card ${selected ? 'is-selected' : ''}"><div class="style-card-top"><span class="style-card-icon">${style.id === 'abigayle' ? '✳' : style.id === 'natural' ? '◌' : '✎'}</span>${selected ? '<span class="style-selected-badge">ACTIVE</span>' : ''}</div><h2>${esc(style.name)}</h2><p>${esc(style.description)}</p><div class="style-instruction-preview">${esc(style.instructions)}</div><div class="style-card-actions"><button class="outline-button" data-style-action="select" data-style-id="${esc(style.id)}" ${selected ? 'disabled' : ''}>${selected ? 'Currently active' : 'Use this method'}</button>${custom ? `<button class="text-button" data-style-action="edit" data-style-id="${esc(style.id)}">Edit</button><button class="text-button delete-style" data-style-action="delete" data-style-id="${esc(style.id)}">Delete</button>` : ''}</div></article>`;
+    }).join('');
+  }
+  function openWritingStyle(styleId = null) {
+    editingStyleId = styleId;
+    const style = styleId ? state.writingStyles.find(item => item.id === styleId) : null;
+    $('#styleDialogTitle').textContent = style ? 'Edit writing method' : 'Add a writing method';
+    $('#styleName').value = style?.name || '';
+    $('#styleInstructions').value = style?.instructions || '';
+    $('#styleDialog').showModal();
+    $('#styleName').focus();
+  }
+  function saveWritingStyle() {
+    const name = $('#styleName').value.trim().slice(0, 40);
+    const instructions = $('#styleInstructions').value.trim().slice(0, 700);
+    if (!name || !instructions) { $('#styleForm').reportValidity(); return; }
+    if (editingStyleId) {
+      const style = state.writingStyles.find(item => item.id === editingStyleId);
+      if (!style) return;
+      Object.assign(style, { name, instructions, description: 'A personal writing method.' });
+    } else {
+      if (state.writingStyles.length >= 20) { showToast('You can save up to 20 custom methods.'); return; }
+      const style = { id: `custom-${crypto.randomUUID()}`, name, instructions, description: 'A personal writing method.' };
+      state.writingStyles.push(style);
+      state.selectedStyleId = style.id;
+    }
+    persist(); renderWritingStyles(); $('#styleDialog').close(); showToast('Writing method saved.');
   }
   function updateSummary() {
     const count = state.people.length;
@@ -170,12 +215,14 @@
   }
   function updatePage() {
     const profilePage = location.hash === '#profile';
+    const stylesPage = location.hash === '#styles';
     const outreachPage = location.hash === '#outreach';
-    $('#composePage').hidden = profilePage;
+    $('#composePage').hidden = profilePage || stylesPage;
     $('#profilePage').hidden = !profilePage;
-    $('#breadcrumbPage').textContent = profilePage ? 'My profile' : outreachPage ? 'Outreach' : 'Compose';
+    $('#stylesPage').hidden = !stylesPage;
+    $('#breadcrumbPage').textContent = profilePage ? 'My profile' : stylesPage ? 'Writing styles' : outreachPage ? 'Outreach' : 'Compose';
     for (const link of $('#mainNavigation').querySelectorAll('.nav-link')) {
-      const selected = profilePage ? link.hash === '#profile' : outreachPage ? link.hash === '#outreach' : link.hash === '#compose';
+      const selected = profilePage ? link.hash === '#profile' : stylesPage ? link.hash === '#styles' : outreachPage ? link.hash === '#outreach' : link.hash === '#compose';
       link.classList.toggle('active', selected);
       if (selected) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
     }
@@ -186,7 +233,7 @@
     const roleProfile = person.role ? (state.roleProfiles[person.role] || { built: '', why: '', how: '', result: '' }) : { built: '', why: '', how: '', result: '' };
     return {
       senderName: state.senderName.trim(), senderFocus: state.senderFocus.trim(), senderExperience: state.senderContext.trim(),
-      roleProfile, framingStyle: state.abigayleMode ? 'abigayle_what_why_how_result' : 'natural',
+      roleProfile, framingStyle: state.selectedStyleId || 'natural',
       recipientName: person.name.trim(), targetRole: person.role, company: person.company.trim(), recipientContext: person.context.trim(), customDirection: state.customPrompt.trim()
     };
   }
@@ -194,7 +241,7 @@
     const context = buildContext(person);
     const factPrompt = `You are a careful outreach writing assistant. Use only the information below. Return a short grounded fact sheet of useful facts and a separate list of anything that must not be claimed. Do not infer achievements, relationships, company facts, or experience. Missing information must stay missing. Keep the facts concise.\n\n${JSON.stringify(context)}`;
     const facts = await requestCompletion([{ role: 'system', content: 'Extract grounded facts for a personal cold email. Never invent facts.' }, { role: 'user', content: factPrompt }], 0.2);
-    const styleInstruction = context.framingStyle === 'abigayle_what_why_how_result' ? 'When using the role profile project, shape its project sentence in this order: what I built or did → why I did it → how I did it → result. Make the sequence sound natural and specific. Use only the supplied fields. If the result is blank, do not invent one; omit it or describe only a supplied qualitative outcome. Do not force this structure onto unrelated sentences.' : 'Write in a natural first-person style using the supplied details.';
+    const styleInstruction = getWritingStyle(context.framingStyle).instructions;
     const draftPrompt = `Write one concise, warm, human cold outreach email based only on this context and fact sheet. Avoid generic flattery, fake familiarity, exaggerated claims, and salesy language. Use a natural greeting and one small, clear ask. Aim for 75–125 words unless the optional direction says otherwise. ${styleInstruction} Return ONLY valid JSON with exactly two string fields: subject and body. No markdown fences.\n\nContext: ${JSON.stringify(context)}\nGrounded fact sheet: ${facts}`;
     const raw = await requestCompletion([{ role: 'system', content: 'You write thoughtful, specific outreach emails that sound like a real person. Follow the required JSON format.' }, { role: 'user', content: draftPrompt }], 0.75);
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
@@ -273,7 +320,7 @@
   setApiStatus();
   updateSidebar();
   renderRoleProfile();
-  renderAbigayleStyle();
+  renderWritingStyles();
   updatePage();
   $('#peopleList').addEventListener('input', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (!card || !field) return; const person = personById(card.dataset.person); if (!person) return; person[field] = event.target.value; persist(); if (field === 'name' || field === 'email') renderOutreach(); });
   $('#peopleList').addEventListener('change', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (card && field) { const person = personById(card.dataset.person); if (person) { person[field] = event.target.value; persist(); } } });
@@ -288,7 +335,24 @@
     profile[field] = event.target.value; state.roleProfiles[state.roleProfileEditorRole] = profile; persist();
     const hasDetails = Object.values(profile).some(value => value.trim()); $('#roleProfileStatus').textContent = hasDetails ? 'PROFILE SAVED' : 'READY TO ADD';
   });
-  $('#abigayleStyle').addEventListener('click', () => { state.abigayleMode = !state.abigayleMode; renderAbigayleStyle(); persist(); showToast(state.abigayleMode ? 'Abigayle framing enabled for new drafts.' : 'Natural framing enabled for new drafts.'); });
+  $('#addWritingStyle').addEventListener('click', () => openWritingStyle());
+  $('#writingStylesList').addEventListener('click', event => {
+    const button = event.target.closest('[data-style-action]');
+    if (!button) return;
+    const { styleAction, styleId } = button.dataset;
+    if (styleAction === 'select') {
+      state.selectedStyleId = styleId; persist(); renderWritingStyles(); showToast(`${getWritingStyle().name} will be used for new drafts.`);
+    } else if (styleAction === 'edit') openWritingStyle(styleId);
+    else if (styleAction === 'delete') {
+      const style = state.writingStyles.find(item => item.id === styleId);
+      if (!style || !confirm(`Delete “${style.name}” from your writing methods?`)) return;
+      state.writingStyles = state.writingStyles.filter(item => item.id !== styleId);
+      if (state.selectedStyleId === styleId) state.selectedStyleId = 'natural';
+      persist(); renderWritingStyles(); showToast('Writing method deleted.');
+    }
+  });
+  $('#saveStyle').addEventListener('click', saveWritingStyle);
+  $('#cancelStyle').addEventListener('click', () => $('#styleDialog').close());
   $('#openSettings').addEventListener('click', openSettings); $('#topSettings').addEventListener('click', openSettings); $('#configureApi').addEventListener('click', openSettings);
   $('#sidebarToggle').addEventListener('click', toggleSidebar);
   $('#sidebarBackdrop').addEventListener('click', () => { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); });
@@ -297,5 +361,5 @@
   window.addEventListener('hashchange', updatePage);
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv);
-  $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, profile, and follow-up from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], abigayleMode: false, people: [newPerson()] }; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderRoleProfile(); renderAbigayleStyle(); renderPeople(); showToast('Workspace cleared.'); });
+  $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, profile, and follow-up from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: {}, roleProfileEditorRole: roles[0], writingStyles: [], selectedStyleId: 'natural', people: [newPerson()] }; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderRoleProfile(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
 })();

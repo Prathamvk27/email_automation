@@ -24,7 +24,7 @@ GitHub Pages serves the HTML, CSS, and JavaScript; the browser runs the app. Tha
 
 ## Data and privacy
 
-- Contacts, base profile, role-specific project profiles, style choice, prompts, and drafts stay in this browser's local storage until cleared.
+- Contacts, base profile, role-specific project profiles, custom writing methods, selected style, prompts, and drafts stay in this browser's local storage until cleared.
 - API keys are held in page memory by default; the explicit remember option stores the key in this browser's local storage until you uncheck the option and save or clear browser data.
 - When you generate a draft, the sender profile, recipient name/role/company/context, and custom direction are sent to the API endpoint you configured. The recipient email address stays in this browser and is not sent to the model. Review the provider's data handling terms before adding resume details.
 - Do not put secrets in the source code or commit an API key.
@@ -33,6 +33,7 @@ GitHub Pages serves the HTML, CSS, and JavaScript; the browser runs the app. Tha
 
 - Up to 25 separate recipients; write a note for one person or generate the whole batch.
 - Role, company, recipient context, sender profile, and optional writing direction.
-- A separate **My profile** page for reusable project stories by target role, with an optional what/why/how/result framing style.
+- A separate Writing styles library with Natural and Abigayle framing methods, plus up to 20 editable custom methods. The selected style is applied to single-person and batch drafts.
+- A separate **My profile** page for reusable project stories by target role.
 - Editable subject and body with copy buttons and `mailto:` handoff.
 - Local outreach tracker with a two-day follow-up date, reply status, and CSV export.

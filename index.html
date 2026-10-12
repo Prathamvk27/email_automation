@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=0dd587d" />
+    <link rel="stylesheet" href="styles.css?v=writing-styles-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -19,6 +19,7 @@
         <nav class="nav-list" id="mainNavigation" aria-label="Main navigation">
           <a class="nav-link active" href="#compose" title="Compose" aria-label="Compose"><span class="nav-icon">✳</span><span class="nav-label">Compose</span><span class="nav-count" id="navCount">01</span></a>
           <a class="nav-link" href="#profile" title="My profile" aria-label="My profile"><span class="nav-icon">◉</span><span class="nav-label">My profile</span></a>
+          <a class="nav-link" href="#styles" title="Writing styles" aria-label="Writing styles"><span class="nav-icon">✎</span><span class="nav-label">Writing styles</span></a>
           <a class="nav-link" href="#outreach" title="Outreach" aria-label="Outreach"><span class="nav-icon">↗</span><span class="nav-label">Outreach</span><span class="nav-count" id="navOutreachCount">00</span></a>
         </nav>
         <div class="sidebar-bottom">
@@ -54,7 +55,7 @@
 
             <section class="panel direction-panel">
               <div class="section-heading"><div><span class="step">02</span><div><h2>Set the direction</h2><p>One extra thought can help the draft sound more like you.</p></div></div><span class="optional-tag">OPTIONAL</span></div>
-              <div class="style-preset-row"><button type="button" class="style-preset" id="abigayleStyle" aria-pressed="false">✳ Abigayle framing <span class="preset-state" id="abigayleState">Off</span></button><p>When on, project sentences follow <b>what I built → why → how → result</b>, using only details you entered.</p></div>
+              <div class="active-style-card"><span class="active-style-icon">✎</span><div><small>WRITING STYLE</small><strong id="activeStyleName">Natural</strong><p id="activeStyleDescription">Warm, clear, and conversational.</p></div><a href="#styles" class="text-button">Change style ↗</a></div>
               <textarea id="customPrompt" rows="3" placeholder="For example: Keep it under 100 words, mention my campus robotics project, and ask if they have 15 minutes next week."></textarea>
               <div class="prompt-foot"><span>✦ This note is included in both writing passes.</span><span id="promptChars">0 / 500</span></div>
             </section>
@@ -67,7 +68,6 @@
             <p class="generation-note">You review every note before sending.<br />Nothing goes out automatically.</p>
           </aside>
         </section>
-
         <section class="outreach-section" id="outreach"><div class="outreach-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEP THE CONVERSATION OPEN</div><h2>Your outreach <span id="outreachTotal">(0)</span></h2><p>Mark a note as sent to start its follow-up timer. Due dates appear here when you return.</p></div><div class="outreach-actions"><button class="outline-button" id="exportCsv">Export list <span>↓</span></button><button class="text-button" id="clearOutreach">Clear workspace</button></div></div><div id="outreachList" class="outreach-list"></div><div id="emptyOutreach" class="empty-state"><span>↗</span><b>Your conversations start here.</b><p>Generate a note, then mark it sent to keep track of replies and follow-ups.</p></div></section>
         <footer class="footer"><a class="brand mini" href="#top"><span class="brand-mark">g<span>.</span></span><span>goodsend</span></a><span>Small notes. Good conversations.</span><span>Made with care <i>✳</i></span></footer>
         </div>
@@ -94,11 +94,17 @@
             </section>
           </div>
         </section>
+        <section class="styles-page" id="stylesPage" aria-labelledby="stylesPageTitle" hidden>
+          <div class="profile-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> SHAPE YOUR VOICE</div><h1 id="stylesPageTitle">Writing styles</h1><p>Choose a framing method for new drafts, or create up to 20 of your own. Styles guide how the model writes; your profile remains the source of personal facts.</p></div><button class="outline-button" id="addWritingStyle">＋ Add a method</button></div>
+          <div class="style-library-intro"><span>✳</span><div><strong>Your active method applies to each person you draft.</strong><p>Saved here in this browser and included automatically when you write one note or a batch.</p></div></div>
+          <div class="style-library" id="writingStylesList"></div>
+        </section>
       </main>
     </div>
 
     <dialog id="settingsDialog" class="settings-dialog"><form method="dialog" id="settingsForm"><div class="dialog-head"><div><span class="step">SETUP</span><h2>Connect your writing model</h2><p>Use an OpenAI-compatible chat completions API. Choose whether to remember your key in this browser.</p></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>API base URL<input id="apiBase" type="url" placeholder="https://api.openai.com/v1" /></label><label>Model<input id="apiModel" placeholder="e.g. gpt-4o-mini" /></label><label>API key<input id="apiKey" type="password" autocomplete="off" placeholder="Paste your own API key" /></label><label class="remember-key-option"><input id="rememberApiKey" type="checkbox" /><span><strong>Remember API key on this device</strong><small>Keep it available after reloading or reopening this page.</small></span></label><div class="security-hint"><span>◉</span><span>When selected, the key is saved in this browser’s local storage. Anyone with access to this browser profile or scripts running on this site could access it. Leave unchecked on shared devices. Uncheck and save to remove the remembered key.</span></div><div class="dialog-actions"><button class="text-button" id="testApi" type="button">Test connection</button><span id="testStatus" class="test-status"></span><button class="outline-button" id="saveApi" type="button">Save settings</button></div><p class="dialog-foot">GitHub Pages hosts this interface only. Never paste a shared or production secret here. Your provider may require browser CORS access.</p></form></dialog>
+    <dialog id="styleDialog" class="settings-dialog style-dialog"><form method="dialog" id="styleForm"><div class="dialog-head"><div><span class="step">CUSTOM METHOD</span><h2 id="styleDialogTitle">Add a writing method</h2><p>Describe the structure or voice you want the model to use. Your saved profile provides the facts.</p></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>Method name<input id="styleName" maxlength="40" placeholder="e.g. Curious builder" required /></label><label>Writing instructions<textarea id="styleInstructions" rows="6" maxlength="700" placeholder="For each project sentence, state what I built, why it mattered, how I approached it, and the result. Keep it natural and specific. Never invent details." required></textarea></label><p class="dialog-foot">Keep instructions focused on tone, structure, and length. Do not add personal facts here; save those in My profile.</p><div class="dialog-actions"><button class="text-button" id="cancelStyle" type="button">Cancel</button><button class="outline-button" id="saveStyle" type="button">Save method</button></div></form></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=0dd587d"></script>
+    <script src="script.js?v=writing-styles-1"></script>
   </body>
 </html>
