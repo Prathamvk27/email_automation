@@ -1,12 +1,14 @@
 (() => {
   const STORE_KEY = 'goodsend.workspace.v1';
+  const API_PREFS_KEY = 'goodsend.api.preferences.v1';
   const MAX_PEOPLE = 25;
   const FOLLOW_UP_DAYS = 2;
   const roles = ['Software engineer', 'Frontend engineer', 'Backend engineer', 'Data / ML', 'Product', 'Design', 'Research', 'Marketing', 'Operations', 'Founder / executive', 'Other'];
   const $ = (selector, root = document) => root.querySelector(selector);
   const newPerson = () => ({ id: crypto.randomUUID(), name: '', email: '', role: '', company: '', context: '', subject: '', body: '', status: 'draft', sentAt: null, followUpAt: null, repliedAt: null });
   let state = loadState();
-  let api = { base: '', model: '', key: '' };
+  let api = { ...loadApiPreferences(), key: '' };
+  const mobileSidebar = window.matchMedia('(max-width: 790px)');
   let toastTimer;
 
   function loadState() {
@@ -14,6 +16,12 @@
       const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
       return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', people: Array.isArray(saved.people) && saved.people.length ? saved.people.slice(0, MAX_PEOPLE) : [newPerson()] };
     } catch { return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', people: [newPerson()] }; }
+  }
+  function loadApiPreferences() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(API_PREFS_KEY) || '{}');
+      return { base: typeof saved.base === 'string' ? saved.base : '', model: typeof saved.model === 'string' ? saved.model : '' };
+    } catch { return { base: '', model: '' }; }
   }
   function persist() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { showToast('Browser storage is full. Export your drafts to keep a copy.'); }
@@ -55,7 +63,7 @@
     const ready = Boolean(api.base && api.model && api.key);
     $('#apiPulse').classList.toggle('ready', ready);
     $('#apiDot').classList.toggle('ready', ready);
-    $('#apiStatus').textContent = ready ? `${api.model} · ready for drafts` : 'Add your API details to begin';
+    $('#apiStatus').textContent = ready ? `${api.model} · ready for drafts` : api.base && api.model ? `${api.model} · add API key` : 'Add your API details to begin';
     $('#configureApi').innerHTML = ready ? 'Update API settings <span>↗</span>' : 'Set up API <span>↗</span>';
   }
   function renderOutreach() {
@@ -99,8 +107,31 @@
   }
   function saveApi() {
     api = { base: $('#apiBase').value.trim(), model: $('#apiModel').value.trim(), key: $('#apiKey').value.trim() };
-    if (!api.base || !api.model || !api.key) { showToast('Add the API URL, model, and key first.'); return; }
-    setApiStatus(); $('#settingsDialog').close(); showToast('API settings are ready for this tab.');
+    if (!api.base || !api.model) { showToast('Add the API URL and model first.'); return; }
+    let preferencesSaved = true;
+    try { localStorage.setItem(API_PREFS_KEY, JSON.stringify({ base: api.base, model: api.model })); }
+    catch { preferencesSaved = false; }
+    setApiStatus(); $('#settingsDialog').close();
+    showToast(preferencesSaved ? (api.key ? 'API ready in this tab. URL and model are saved on this device.' : 'URL and model saved. Add your API key in this tab to write notes.') : (api.key ? 'API ready in this tab, but this browser could not save the URL and model.' : 'Add your API key in this tab. This browser could not save the URL and model.'));
+  }
+  function updateSidebar() {
+    const collapsed = localStorage.getItem('goodsend.sidebar.collapsed') === 'true';
+    const isMobile = mobileSidebar.matches;
+    document.body.classList.toggle('sidebar-collapsed', !isMobile && collapsed);
+    const isOpen = isMobile ? document.body.classList.contains('sidebar-mobile-open') : !collapsed;
+    const toggle = $('#sidebarToggle');
+    toggle.setAttribute('aria-expanded', String(isOpen));
+    toggle.setAttribute('aria-label', isMobile ? (isOpen ? 'Close navigation' : 'Open navigation') : (collapsed ? 'Expand navigation' : 'Collapse navigation'));
+    toggle.title = isMobile ? (isOpen ? 'Close navigation' : 'Open navigation') : (collapsed ? 'Expand navigation' : 'Collapse navigation');
+    $('#sidebarBackdrop').setAttribute('aria-hidden', String(!isMobile || !isOpen));
+  }
+  function toggleSidebar() {
+    if (mobileSidebar.matches) document.body.classList.toggle('sidebar-mobile-open');
+    else {
+      const collapsed = !document.body.classList.contains('sidebar-collapsed');
+      localStorage.setItem('goodsend.sidebar.collapsed', String(collapsed));
+    }
+    updateSidebar();
   }
   function buildContext(person) {
     return {
@@ -175,6 +206,7 @@
   window.setInterval(updateSummary, 60000);
   $('#senderName').value = state.senderName; $('#senderFocus').value = state.senderFocus; $('#senderContext').value = state.senderContext; $('#customPrompt').value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`;
   setApiStatus();
+  updateSidebar();
   $('#peopleList').addEventListener('input', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (!card || !field) return; const person = personById(card.dataset.person); if (!person) return; person[field] = event.target.value; persist(); if (field === 'name' || field === 'email') renderOutreach(); });
   $('#peopleList').addEventListener('change', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (card && field) { const person = personById(card.dataset.person); if (person) { person[field] = event.target.value; persist(); } } });
   $('#peopleList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.closest('[data-person]')?.dataset.person); });
@@ -183,6 +215,11 @@
   for (const [id, key] of [['senderName','senderName'], ['senderFocus','senderFocus'], ['senderContext','senderContext']]) $(`#${id}`).addEventListener('input', event => { state[key] = event.target.value; persist(); });
   $('#customPrompt').addEventListener('input', event => { state.customPrompt = event.target.value.slice(0, 500); if (event.target.value.length > 500) event.target.value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; persist(); });
   $('#openSettings').addEventListener('click', openSettings); $('#topSettings').addEventListener('click', openSettings); $('#configureApi').addEventListener('click', openSettings);
+  $('#sidebarToggle').addEventListener('click', toggleSidebar);
+  $('#sidebarBackdrop').addEventListener('click', () => { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); });
+  $('#mainNavigation').addEventListener('click', () => { if (mobileSidebar.matches) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
+  mobileSidebar.addEventListener('change', () => { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv);
   $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, and follow-up from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', people: [newPerson()] }; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderPeople(); showToast('Workspace cleared.'); });
 })();
