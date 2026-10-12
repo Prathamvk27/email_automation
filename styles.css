@@ -34,3 +34,4 @@ body{font-size:15px}.topbar-left{display:flex;align-items:center;gap:14px}.sideb
 @media(max-width:790px){.resume-panel{padding:17px}.profile-page-content .resume-panel{padding:17px}}
 @media(max-width:560px){.story-management{align-items:flex-start}.profile-page-content .resume-panel{padding:15px 13px}.resume-controls{align-items:flex-start}}
 .resume-upload:has(input:focus-visible){outline:3px solid #8cab88;outline-offset:2px}
+.brand-mark{font:italic 800 27px var(--serif);letter-spacing:-2px;color:var(--green)}.sidebar-collapsed .brand>span.brand-mark{display:inline}
