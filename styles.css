@@ -54,3 +54,32 @@ body{font-size:15px}.topbar-left{display:flex;align-items:center;gap:14px}.sideb
 .outreach-person-meta{flex:1;min-width:0}.contact-star{width:36px;height:36px;flex:0 0 36px;border:1px solid transparent;border-radius:7px;background:transparent;color:#929d91;font:22px/1 var(--sans);cursor:pointer}.contact-star:hover{border-color:#e6ebdf;background:#f6f8f2;color:#8e9d62}.contact-star.is-starred{color:#799048}.contact-star:focus-visible{outline:3px solid #9bb69c;outline-offset:2px}
 .contacts-page{max-width:1000px}.contacts-page-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.contacts-page-actions a{text-decoration:none}.contacts-panel{padding:22px}.contacts-panel .section-heading h2{font-size:18px}.contacts-panel .section-heading h2 span{color:#829083;font-size:13px;font-weight:500}.contacts-search{display:grid;gap:6px;max-width:420px;margin:0 0 14px;color:#65736a;font-size:12px;font-weight:600}.contacts-search input{width:100%;min-height:40px;padding:9px 12px;border:1px solid #dfe5dc;border-radius:7px;background:#fff;color:#34443b;font:13px var(--sans)}.contacts-search input:focus{border-color:#9bb69c;box-shadow:0 0 0 2px #e8f1e8;outline:none}.contacts-list{display:grid;gap:9px}.saved-contact-card{display:flex;align-items:center;gap:12px;padding:13px;border:1px solid #e5eae3;border-radius:8px;background:#fff}.saved-contact-info{display:grid;gap:4px;min-width:0;flex:1}.saved-contact-info strong{overflow:hidden;color:#34443b;font-size:13px;text-overflow:ellipsis;white-space:nowrap}.saved-contact-info span,.saved-contact-info small{overflow-wrap:anywhere;color:#5e6b61;font-size:12px;line-height:1.45}.saved-contact-card .outline-button{flex:0 0 auto}.saved-contact-card .outline-button:disabled{color:#8c978d;background:#f7f8f5;cursor:default}.contacts-page .empty-state{margin-top:10px}.contacts-page .empty-state[hidden]{display:none!important}
 @media(max-width:560px){.contacts-panel{padding:15px 13px}.saved-contact-card{align-items:flex-start;gap:9px;padding:11px}.saved-contact-card .person-avatar{width:30px;height:30px}.saved-contact-card .outline-button{align-self:center;padding:7px;font-size:11px;white-space:nowrap}.saved-contact-info strong{font-size:12px}.saved-contact-info span,.saved-contact-info small{font-size:11px}}
+
+/* Final readability and touch target pass */
+.text-button{color:#53665a}
+.text-button:hover{color:#304f40}
+.active-style-card small,.style-selected-badge{font-size:11px}
+.queue-heading label,.queue-status{color:#526256;font-size:12px;line-height:1.5}
+.outreach-summary article span{color:#5d6b61;font-size:11px}
+.outreach-search{font-size:12px}
+.outreach-search input::placeholder,.contacts-search input::placeholder{color:#68766c;opacity:1}
+.outreach-filter{min-height:40px}
+.status-pill{color:#536256;font-size:12px}
+.status-pill.due{color:#825a2d}
+.outreach-page .outreach-tools .small-action{min-height:40px;font-size:12px;line-height:1.3}
+.small-action:disabled{cursor:not-allowed}
+.outreach-bulk-toolbar>button:disabled{border-color:#d8dfd7;background:#f0f3ee;color:#5f6d63;opacity:1}
+
+@media(max-width:790px){
+  .icon-button{width:42px;height:42px}
+  .small-action{min-height:42px}
+  .contact-star{width:42px;height:42px;flex-basis:42px}
+  .outreach-filter{min-height:42px}
+}
+
+@media(max-width:560px){
+  .text-button,.outline-button{min-height:44px}
+  .small-action,.outreach-page .outreach-tools .small-action{min-height:44px}
+  .outreach-filter{min-height:42px}
+  .outreach-bulk-toolbar>button{min-height:44px}
+}
