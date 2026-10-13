@@ -43,6 +43,8 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   let bulkStopRequested = false;
   let bulkWaitTimer = null;
   let bulkWaitResolve = null;
+  let bulkGmailRunning = false;
+  let bulkGmailStopRequested = false;
   let toastTimer;
 
   function loadState() {
@@ -245,19 +247,24 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       return matchesStatus && (!query || searchable.includes(query));
     });
     for (const personId of [...selectedOutreachIds]) {
-      if (!items.some(person => person.id === personId && person.status === 'draft')) selectedOutreachIds.delete(personId);
+      if (!items.some(person => person.id === personId)) selectedOutreachIds.delete(personId);
     }
-    const selectedDrafts = selectedOutreachIds.size;
-    $('#bulkSelectedCount').textContent = `${selectedDrafts} selected`;
-    $('#bulkReworkButton').disabled = selectedDrafts === 0 || bulkReworkRunning;
-    $('#clearOutreachSelection').hidden = selectedDrafts === 0;
-    $('#clearOutreachSelection').disabled = bulkReworkRunning;
-    const visibleDrafts = filteredItems.filter(person => person.status === 'draft');
-    const visibleSelected = visibleDrafts.filter(person => selectedOutreachIds.has(person.id)).length;
-    const selectVisible = $('#selectVisibleDrafts');
-    selectVisible.checked = visibleDrafts.length > 0 && visibleSelected === visibleDrafts.length;
-    selectVisible.indeterminate = visibleSelected > 0 && visibleSelected < visibleDrafts.length;
-    selectVisible.disabled = visibleDrafts.length === 0 || bulkReworkRunning;
+    const selectedPeople = items.filter(person => selectedOutreachIds.has(person.id));
+    const selectedDrafts = selectedPeople.filter(person => person.status === 'draft');
+    const validSelected = selectedPeople.filter(hasUsableMessage);
+    const validDrafts = selectedDrafts.filter(hasUsableMessage);
+    $('#bulkSelectedCount').textContent = `${selectedPeople.length} selected${selectedPeople.length && selectedDrafts.length !== selectedPeople.length ? ` · ${selectedDrafts.length} drafts` : ''}`;
+    $('#bulkReworkButton').disabled = !selectedDrafts.some(person => person.subject && person.body) || bulkReworkRunning || bulkGmailRunning;
+    $('#bulkMarkSentButton').disabled = validDrafts.length === 0 || bulkReworkRunning || bulkGmailRunning;
+    $('#bulkOpenGmailButton').disabled = validSelected.length === 0 || bulkReworkRunning || bulkGmailRunning;
+    $('#bulkCreateGmailButton').disabled = !validSelected.some(person => !person.gmailDraftId) || bulkReworkRunning || bulkGmailRunning;
+    $('#clearOutreachSelection').hidden = selectedPeople.length === 0;
+    $('#clearOutreachSelection').disabled = bulkReworkRunning || bulkGmailRunning;
+    const visibleSelected = filteredItems.filter(person => selectedOutreachIds.has(person.id)).length;
+    const selectVisible = $('#selectVisibleOutreach');
+    selectVisible.checked = filteredItems.length > 0 && visibleSelected === filteredItems.length;
+    selectVisible.indeterminate = visibleSelected > 0 && visibleSelected < filteredItems.length;
+    selectVisible.disabled = filteredItems.length === 0 || bulkReworkRunning || bulkGmailRunning;
     for (const button of $('#outreachFilters').querySelectorAll('[data-outreach-filter]')) {
       const selected = button.dataset.outreachFilter === outreachFilter;
       button.classList.toggle('active', selected);
@@ -275,8 +282,8 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       const resumeAction = `<button class="small-action primary" data-action="gmail-draft" data-person="${esc(person.id)}" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}`;
       const removeBusy = reworkingPeople.has(person.id) || gmailDrafting.has(person.id);
       const removeAction = `<button class="small-action remove-outreach" data-action="remove-outreach" data-person="${esc(person.id)}" aria-label="Remove ${esc(person.name || person.email || 'contact')} from Outreach" ${removeBusy ? 'disabled' : ''}>Remove</button>`;
-      const selectDraft = person.status === 'draft' ? `<label class="outreach-select"><input type="checkbox" data-outreach-select="${esc(person.id)}" ${selectedOutreachIds.has(person.id) ? 'checked' : ''} aria-label="Select ${esc(person.name || person.email || 'draft')} for bulk rework" /><span class="sr-only">Select for bulk rework</span></label>` : '';
-      return `<article class="outreach-card"><div class="outreach-person">${selectDraft}<span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.jobTitle || person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}${person.jobId ? ` · Job ID ${esc(person.jobId)}` : ''}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}${removeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
+      const selectMail = `<label class="outreach-select"><input type="checkbox" data-outreach-select="${esc(person.id)}" ${selectedOutreachIds.has(person.id) ? 'checked' : ''} ${bulkReworkRunning || bulkGmailRunning ? 'disabled' : ''} aria-label="Select ${esc(person.name || person.email || 'email')} for bulk actions" /><span class="sr-only">Select for bulk actions</span></label>`;
+      return `<article class="outreach-card"><div class="outreach-person">${selectMail}<span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.jobTitle || person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}${person.jobId ? ` · Job ID ${esc(person.jobId)}` : ''}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}${removeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
   }
   function showToast(message) {
@@ -295,6 +302,95 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     if (!state.people.length) state.people.push(newPerson());
   }
   function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+  function hasUsableMessage(person) { return Boolean(person?.email && validEmail(person.email) && person.subject?.trim() && person.body?.trim()); }
+  function selectedOutreachPeople() { return state.outreach.filter(person => selectedOutreachIds.has(person.id)); }
+  function setBulkActionStatus(message) {
+    const status = $('#bulkActionStatus');
+    status.textContent = message;
+    status.hidden = !message;
+  }
+  function ensureBulkActionsIdle() {
+    if (generatingAll || generatingPeople.size || reworkingPeople.size || bulkReworkRunning || queueLoopActive || gmailDrafting.size || bulkGmailRunning) {
+      showToast('Wait for the current email action to finish first.');
+      return false;
+    }
+    return true;
+  }
+  function bulkMarkSent() {
+    if (!ensureBulkActionsIdle()) return;
+    const eligible = selectedOutreachPeople().filter(person => person.status === 'draft' && hasUsableMessage(person));
+    if (!eligible.length) { showToast('Select at least one unsent draft with a valid email, subject, and message.'); return; }
+    const skipped = selectedOutreachIds.size - eligible.length;
+    if (!confirm(`Mark ${eligible.length} selected draft${eligible.length === 1 ? '' : 's'} as sent? Each follow-up will be set for two days from now.${skipped ? ` ${skipped} selected email${skipped === 1 ? '' : 's'} will be skipped because they are already sent/replied or missing required details.` : ''}`)) return;
+    const now = Date.now();
+    for (const person of eligible) {
+      person.status = 'sent';
+      person.sentAt = new Date(now).toISOString();
+      person.followUpAt = new Date(now + FOLLOW_UP_DAYS * 86400000).toISOString();
+      person.repliedAt = null;
+    }
+    persist(); renderPeople();
+    setBulkActionStatus(`Marked ${eligible.length} email${eligible.length === 1 ? '' : 's'} sent. Selected sent and replied records were left unchanged.`);
+  }
+  function openSelectedInGmail() {
+    const selected = selectedOutreachPeople();
+    const eligible = selected.filter(hasUsableMessage);
+    if (!eligible.length) { showToast('Select at least one email with a valid address, subject, and message.'); return; }
+    $('#bulkComposeDescription').textContent = `${eligible.length} prefilled Gmail compose link${eligible.length === 1 ? '' : 's'} shown${selected.length > eligible.length ? `; ${selected.length - eligible.length} selected record${selected.length - eligible.length === 1 ? '' : 's'} skipped because an address, subject, or message is missing` : ''}. Open each link from this list. Browsers may block a batch of tabs opened from one click.`;
+    $('#bulkComposeLinks').innerHTML = eligible.map(person => {
+      const url = new URL('https://mail.google.com/mail/');
+      url.searchParams.set('view', 'cm'); url.searchParams.set('fs', '1');
+      url.searchParams.set('to', person.email); url.searchParams.set('su', person.subject); url.searchParams.set('body', person.body);
+      return `<a class="bulk-compose-link" href="${esc(url.toString())}" target="_blank" rel="noopener noreferrer"><span><strong>${esc(person.name || person.email)}</strong><small>${esc(person.email)} · ${esc(person.subject)}</small></span><b>Open ↗</b></a>`;
+    }).join('');
+    $('#bulkComposeDialog').showModal();
+  }
+  async function createSelectedGmailDrafts() {
+    if (!ensureBulkActionsIdle()) return;
+    const eligible = selectedOutreachPeople().filter(person => hasUsableMessage(person) && !person.gmailDraftId);
+    if (!eligible.length) { showToast('Select an email with a valid address and message that does not already have a Gmail draft.'); return; }
+    if (!gmailSettings.clientId) { showToast('Add and save your Google OAuth client ID in My profile first.'); return; }
+    if (!confirm(`Create ${eligible.length} Gmail draft${eligible.length === 1 ? '' : 's'} with your resume attached? Existing Gmail drafts are skipped. Nothing will be sent.`)) return;
+    bulkGmailRunning = true; bulkGmailStopRequested = false;
+    setBulkActionStatus('Connecting to Gmail…');
+    $('#stopBulkGmail').hidden = false;
+    renderOutreach();
+    let created = 0; let failed = 0; let stopped = false;
+    try {
+      const token = await gmailAccessToken();
+      const resume = await getResumeFile();
+      if (!resume) throw new Error('Add your resume first in My profile.');
+      for (let index = 0; index < eligible.length; index++) {
+        if (bulkGmailStopRequested) { stopped = true; break; }
+        const person = state.outreach.find(item => item.id === eligible[index].id);
+        if (!person || person.gmailDraftId || !hasUsableMessage(person)) { failed++; continue; }
+        setBulkActionStatus(`Creating Gmail draft ${index + 1} of ${eligible.length}: ${person.name || person.email}…`);
+        try {
+          const raw = await makeGmailRawMessage(person, resume);
+          const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: { raw } })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error?.message || `Gmail returned ${response.status}.`);
+          person.gmailDraftId = result.id;
+          person.gmailDraftCreatedAt = new Date().toISOString();
+          created++; persist(); renderPeople(); renderOutreach();
+        } catch (error) {
+          failed++;
+          setBulkActionStatus(`Could not create a Gmail draft for ${person.name || person.email}: ${error.message || 'Gmail request failed.'}`);
+        }
+      }
+    } catch (error) {
+      failed = eligible.length;
+      setBulkActionStatus(error.message || 'Could not connect to Gmail or load the saved resume.');
+    } finally {
+      bulkGmailRunning = false;
+      $('#stopBulkGmail').hidden = true;
+      renderOutreach();
+      if (created || stopped) setBulkActionStatus(`${created} Gmail draft${created === 1 ? '' : 's'} created with your resume${failed ? `; ${failed} skipped or failed` : ''}${stopped ? '; stopped after the current email' : ''}. Nothing was sent.`);
+    }
+  }
   function openResumeDatabase() {
     return new Promise((resolve, reject) => {
       if (!('indexedDB' in window)) { reject(new Error('This browser does not support local resume storage.')); return; }
@@ -771,12 +867,13 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   function openBulkRework() {
     if (!api.key) { openSettings(); showToast('Connect your own API key to rework drafts.'); return; }
     if (generatingAll || generatingPeople.size || reworkingPeople.size || bulkReworkRunning || queueLoopActive || gmailDrafting.size) { showToast('Wait for the current email action to finish first.'); return; }
-    bulkReworkIds = [...selectedOutreachIds].filter(id => state.outreach.some(person => person.id === id && person.status === 'draft'));
+    bulkReworkIds = selectedOutreachPeople().filter(person => person.status === 'draft' && person.subject && person.body).map(person => person.id);
     if (!bulkReworkIds.length) { showToast('Select at least one saved draft first.'); return; }
     bulkReworkResults = [];
     bulkStopRequested = false;
     $('#bulkReworkDirection').value = '';
-    $('#bulkReworkDescription').textContent = `${bulkReworkIds.length} selected draft${bulkReworkIds.length === 1 ? '' : 's'}. Each revision is reviewed before it replaces the saved version.`;
+    const selectedCount = selectedOutreachIds.size;
+    $('#bulkReworkDescription').textContent = `${bulkReworkIds.length} of ${selectedCount} selected email${selectedCount === 1 ? '' : 's'} are unsent drafts with a saved subject and message. Only those drafts will be revised; every result is reviewed before it replaces the saved version.`;
     $('#bulkReworkPaceNote').textContent = `Runs one contact at a time with ${state.queueIntervalSeconds || 30} seconds between contacts. Each revision uses two model calls.`;
     $('#bulkReworkProgressBox').hidden = true;
     $('#bulkReworkResults').hidden = true;
@@ -1022,9 +1119,13 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   $('#outreachList').addEventListener('change', event => { const checkbox = event.target.closest('[data-outreach-select]'); if (!checkbox) return; if (checkbox.checked) selectedOutreachIds.add(checkbox.dataset.outreachSelect); else selectedOutreachIds.delete(checkbox.dataset.outreachSelect); renderOutreach(); });
   $('#outreachFilters').addEventListener('click', event => { const button = event.target.closest('[data-outreach-filter]'); if (!button) return; outreachFilter = button.dataset.outreachFilter; renderOutreach(); });
   $('#outreachSearch').addEventListener('input', renderOutreach);
-  $('#selectVisibleDrafts').addEventListener('change', event => { for (const checkbox of $('#outreachList').querySelectorAll('[data-outreach-select]')) { if (event.target.checked) selectedOutreachIds.add(checkbox.dataset.outreachSelect); else selectedOutreachIds.delete(checkbox.dataset.outreachSelect); } renderOutreach(); });
-  $('#clearOutreachSelection').addEventListener('click', () => { if (bulkReworkRunning) return; selectedOutreachIds.clear(); renderOutreach(); });
+  $('#selectVisibleOutreach').addEventListener('change', event => { for (const checkbox of $('#outreachList').querySelectorAll('[data-outreach-select]')) { if (event.target.checked) selectedOutreachIds.add(checkbox.dataset.outreachSelect); else selectedOutreachIds.delete(checkbox.dataset.outreachSelect); } renderOutreach(); });
+  $('#clearOutreachSelection').addEventListener('click', () => { if (bulkReworkRunning || bulkGmailRunning) return; selectedOutreachIds.clear(); renderOutreach(); });
   $('#bulkReworkButton').addEventListener('click', openBulkRework);
+  $('#bulkMarkSentButton').addEventListener('click', bulkMarkSent);
+  $('#bulkOpenGmailButton').addEventListener('click', openSelectedInGmail);
+  $('#bulkCreateGmailButton').addEventListener('click', createSelectedGmailDrafts);
+  $('#stopBulkGmail').addEventListener('click', () => { if (bulkGmailRunning) { bulkGmailStopRequested = true; setBulkActionStatus('Will stop after the current Gmail draft finishes…'); } });
   $('#runBulkRework').addEventListener('click', runBulkRework);
   $('#stopBulkRework').addEventListener('click', requestBulkStop);
   $('#applyBulkRework').addEventListener('click', applyBulkRework);
