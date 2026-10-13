@@ -27,6 +27,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   const mobileSidebar = window.matchMedia('(max-width: 790px)');
   const generatingPeople = new Set();
   const reworkingPeople = new Set();
+  const selectedOutreachIds = new Set();
   let generatingAll = false;
   let queueTimer = null;
   let queueWake = null;
@@ -36,6 +37,12 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   let reworkCandidate = null;
   let reworkOriginal = null;
   let outreachFilter = 'all';
+  let bulkReworkIds = [];
+  let bulkReworkResults = [];
+  let bulkReworkRunning = false;
+  let bulkStopRequested = false;
+  let bulkWaitTimer = null;
+  let bulkWaitResolve = null;
   let toastTimer;
 
   function loadState() {
@@ -237,6 +244,20 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       const searchable = [person.name, person.email, person.company, person.role, person.jobTitle, person.jobId, person.subject].join(' ').toLocaleLowerCase();
       return matchesStatus && (!query || searchable.includes(query));
     });
+    for (const personId of [...selectedOutreachIds]) {
+      if (!items.some(person => person.id === personId && person.status === 'draft')) selectedOutreachIds.delete(personId);
+    }
+    const selectedDrafts = selectedOutreachIds.size;
+    $('#bulkSelectedCount').textContent = `${selectedDrafts} selected`;
+    $('#bulkReworkButton').disabled = selectedDrafts === 0 || bulkReworkRunning;
+    $('#clearOutreachSelection').hidden = selectedDrafts === 0;
+    $('#clearOutreachSelection').disabled = bulkReworkRunning;
+    const visibleDrafts = filteredItems.filter(person => person.status === 'draft');
+    const visibleSelected = visibleDrafts.filter(person => selectedOutreachIds.has(person.id)).length;
+    const selectVisible = $('#selectVisibleDrafts');
+    selectVisible.checked = visibleDrafts.length > 0 && visibleSelected === visibleDrafts.length;
+    selectVisible.indeterminate = visibleSelected > 0 && visibleSelected < visibleDrafts.length;
+    selectVisible.disabled = visibleDrafts.length === 0 || bulkReworkRunning;
     for (const button of $('#outreachFilters').querySelectorAll('[data-outreach-filter]')) {
       const selected = button.dataset.outreachFilter === outreachFilter;
       button.classList.toggle('active', selected);
@@ -254,7 +275,8 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       const resumeAction = `<button class="small-action primary" data-action="gmail-draft" data-person="${esc(person.id)}" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}`;
       const removeBusy = reworkingPeople.has(person.id) || gmailDrafting.has(person.id);
       const removeAction = `<button class="small-action remove-outreach" data-action="remove-outreach" data-person="${esc(person.id)}" aria-label="Remove ${esc(person.name || person.email || 'contact')} from Outreach" ${removeBusy ? 'disabled' : ''}>Remove</button>`;
-      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.jobTitle || person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}${person.jobId ? ` · Job ID ${esc(person.jobId)}` : ''}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}${removeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
+      const selectDraft = person.status === 'draft' ? `<label class="outreach-select"><input type="checkbox" data-outreach-select="${esc(person.id)}" ${selectedOutreachIds.has(person.id) ? 'checked' : ''} aria-label="Select ${esc(person.name || person.email || 'draft')} for bulk rework" /><span class="sr-only">Select for bulk rework</span></label>` : '';
+      return `<article class="outreach-card"><div class="outreach-person">${selectDraft}<span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.jobTitle || person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}${person.jobId ? ` · Job ID ${esc(person.jobId)}` : ''}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}${removeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
   }
   function showToast(message) {
@@ -644,7 +666,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   }
   function generateAll() {
     if (!api.key) { openSettings(); showToast('Connect your own API key to write notes.'); return; }
-    if (generatingPeople.size) { showToast('Wait for the current note to finish writing.'); return; }
+    if (generatingPeople.size || bulkReworkRunning) { showToast('Wait for the current note or bulk rework to finish.'); return; }
     if (state.queue?.status === 'running') return;
     const pausedQueue = state.queue?.status === 'paused' && state.queue.index < state.queue.ids.length;
     if (pausedQueue) {
@@ -684,7 +706,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   }
   async function generateOne(person) {
     if (!api.key) { openSettings(); showToast('Connect your own API key to write notes.'); return; }
-    if (generatingAll || generatingPeople.size) { showToast('Wait for the current note to finish writing.'); return; }
+    if (generatingAll || generatingPeople.size || bulkReworkRunning) { showToast('Wait for the current note or bulk rework to finish.'); return; }
     if (!validEmail(person.email)) { showToast(`Add a valid email for ${person.name || 'this person'} first.`); document.querySelector(`[data-person="${CSS.escape(person.id)}"] [data-field="email"]`)?.focus(); return; }
     generatingPeople.add(person.id); person.error = ''; renderPeople();
     let succeeded = false;
@@ -722,27 +744,176 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'goodsend-outreach.csv'; link.click(); URL.revokeObjectURL(link.href);
   }
   function removeOutreach(person) {
-    if (reworkingPeople.has(person.id) || gmailDrafting.has(person.id)) { showToast('Wait for this email action to finish first.'); return; }
+    if (reworkingPeople.has(person.id) || gmailDrafting.has(person.id) || (bulkReworkRunning && bulkReworkIds.includes(person.id))) { showToast('Wait for this email action to finish first.'); return; }
     const name = person.name || person.email || 'this contact';
     const gmailNote = person.gmailDraftId ? ' A copy already created in Gmail will remain there.' : '';
     if (!confirm(`Remove ${name} and its saved message, reply status, and follow-up from this device?${gmailNote}`)) return;
     state.outreach = state.outreach.filter(item => item.id !== person.id);
+    selectedOutreachIds.delete(person.id);
     persist();
     renderPeople();
     showToast(`${name} removed from Outreach.`);
   }
   function clearOutreach() {
     if (!state.outreach.length) { showToast('Your Outreach list is already empty.'); return; }
-    if (reworkingPeople.size || gmailDrafting.size) { showToast('Wait for the current email action to finish first.'); return; }
+    if (reworkingPeople.size || gmailDrafting.size || bulkReworkRunning) { showToast('Wait for the current email action to finish first.'); return; }
     const gmailCopies = state.outreach.filter(person => person.gmailDraftId).length;
     const gmailNote = gmailCopies ? ` ${gmailCopies} Gmail draft${gmailCopies === 1 ? '' : 's'} already created will remain in Gmail.` : '';
     if (!confirm(`Remove all ${state.outreach.length} contacts and saved messages from this device? Your Compose contacts, profile, resume, and settings will stay.${gmailNote}`)) return;
     state.outreach = [];
     outreachFilter = 'all';
+    selectedOutreachIds.clear();
     $('#outreachSearch').value = '';
     persist();
     renderPeople();
     showToast('Outreach list cleared. Your profile and Compose contacts are still saved.');
+  }
+  function openBulkRework() {
+    if (!api.key) { openSettings(); showToast('Connect your own API key to rework drafts.'); return; }
+    if (generatingAll || generatingPeople.size || reworkingPeople.size || bulkReworkRunning || queueLoopActive || gmailDrafting.size) { showToast('Wait for the current email action to finish first.'); return; }
+    bulkReworkIds = [...selectedOutreachIds].filter(id => state.outreach.some(person => person.id === id && person.status === 'draft'));
+    if (!bulkReworkIds.length) { showToast('Select at least one saved draft first.'); return; }
+    bulkReworkResults = [];
+    bulkStopRequested = false;
+    $('#bulkReworkDirection').value = '';
+    $('#bulkReworkDescription').textContent = `${bulkReworkIds.length} selected draft${bulkReworkIds.length === 1 ? '' : 's'}. Each revision is reviewed before it replaces the saved version.`;
+    $('#bulkReworkPaceNote').textContent = `Runs one contact at a time with ${state.queueIntervalSeconds || 30} seconds between contacts. Each revision uses two model calls.`;
+    $('#bulkReworkProgressBox').hidden = true;
+    $('#bulkReworkResults').hidden = true;
+    $('#bulkReworkResults').innerHTML = '';
+    $('#bulkReworkSummary').textContent = '';
+    $('#runBulkRework').hidden = false;
+    $('#runBulkRework').disabled = false;
+    $('#runBulkRework').textContent = 'Rework drafts';
+    $('#stopBulkRework').hidden = true;
+    $('#cancelBulkRework').disabled = false;
+    $('#applyBulkRework').hidden = true;
+    $('#bulkReworkDialog').showModal();
+    $('#bulkReworkDirection').focus();
+  }
+  function waitForBulkInterval(ms) {
+    return new Promise(resolve => {
+      bulkWaitResolve = resolve;
+      bulkWaitTimer = setTimeout(() => {
+        bulkWaitTimer = null;
+        bulkWaitResolve = null;
+        resolve();
+      }, ms);
+    });
+  }
+  function requestBulkStop() {
+    if (!bulkReworkRunning) return;
+    bulkStopRequested = true;
+    $('#bulkReworkStatus').textContent = 'Stopping after the current email revision…';
+    if (bulkWaitTimer) clearTimeout(bulkWaitTimer);
+    bulkWaitTimer = null;
+    const resolveWait = bulkWaitResolve;
+    bulkWaitResolve = null;
+    resolveWait?.();
+  }
+  function renderBulkReworkResults() {
+    const list = $('#bulkReworkResults');
+    list.innerHTML = bulkReworkResults.map(result => {
+      const name = esc(result.name || result.email || 'Contact');
+      if (!result.ok) return `<article class="bulk-rework-result failed"><strong>${name} · Not revised</strong><p>${esc(result.error || 'Could not generate a revision.')}</p></article>`;
+      return `<article class="bulk-rework-result"><label class="bulk-result-apply"><input type="checkbox" data-bulk-apply="${esc(result.id)}" ${result.apply ? 'checked' : ''} /><span>Apply revision for <strong>${name}</strong></span></label><details><summary>${esc(result.subject)}</summary><div class="bulk-result-message"><strong>Revised email</strong><p>${esc(result.body)}</p></div></details></article>`;
+    }).join('');
+    list.hidden = bulkReworkResults.length === 0;
+    const applicableCount = bulkReworkResults.filter(result => result.ok && result.apply).length;
+    $('#applyBulkRework').hidden = !bulkReworkResults.some(result => result.ok);
+    $('#applyBulkRework').disabled = bulkReworkRunning;
+    $('#applyBulkRework').textContent = `Apply ${applicableCount} selected revision${applicableCount === 1 ? '' : 's'}`;
+  }
+  async function runBulkRework() {
+    if (bulkReworkRunning) return;
+    if (!api.key) { $('#bulkReworkDialog').close(); openSettings(); showToast('Connect your own API key to rework drafts.'); return; }
+    const direction = $('#bulkReworkDirection').value.trim();
+    const successfulIds = new Set(bulkReworkResults.filter(result => result.ok).map(result => result.id));
+    const pendingIds = bulkReworkIds.filter(id => !successfulIds.has(id));
+    if (!pendingIds.length) { $('#bulkReworkSummary').textContent = 'All selected drafts have a revision ready. Review them below.'; return; }
+    bulkReworkRunning = true;
+    bulkStopRequested = false;
+    $('#bulkReworkProgressBox').hidden = false;
+    $('#bulkReworkProgress').max = bulkReworkIds.length;
+    $('#bulkReworkProgress').value = successfulIds.size;
+    $('#runBulkRework').disabled = true;
+    $('#stopBulkRework').hidden = false;
+    $('#cancelBulkRework').disabled = true;
+    $('#bulkReworkSummary').textContent = 'Your saved drafts stay unchanged while revisions are generated.';
+    renderOutreach();
+    try {
+      for (let index = 0; index < pendingIds.length; index++) {
+        if (bulkStopRequested) break;
+        const id = pendingIds[index];
+        const person = state.outreach.find(item => item.id === id && item.status === 'draft');
+        bulkReworkResults = bulkReworkResults.filter(result => result.id !== id);
+        if (!person) {
+          bulkReworkResults.push({ id, name: 'Contact', ok: false, error: 'This draft is no longer available.' });
+        } else {
+          const original = { subject: person.subject, body: person.body };
+          $('#bulkReworkStatus').textContent = `Reworking ${index + 1} of ${pendingIds.length}: ${person.name || person.email || 'contact'}…`;
+          try {
+            const candidate = { ...person };
+            await generatePerson(candidate, { direction, previousDraft: original });
+            bulkReworkResults.push({ id, name: person.name, email: person.email, subject: candidate.subject, body: candidate.body, original, apply: true, ok: true });
+          } catch (error) {
+            const message = error.message || 'Could not generate a revision.';
+            bulkReworkResults.push({ id, name: person.name, email: person.email, ok: false, error: message });
+            if (/\b429\b|rate.?limit|too many requests|quota/i.test(message)) {
+              bulkStopRequested = true;
+              $('#bulkReworkStatus').textContent = 'Paused because the model provider reported a rate limit. Wait, then choose Continue remaining.';
+            }
+          }
+        }
+        const finished = new Set(bulkReworkResults.map(result => result.id)).size;
+        $('#bulkReworkProgress').value = finished;
+        renderBulkReworkResults();
+        renderOutreach();
+        if (bulkStopRequested) break;
+        if (index < pendingIds.length - 1) await waitForBulkInterval((state.queueIntervalSeconds || 30) * 1000);
+      }
+    } finally {
+      bulkReworkRunning = false;
+      if (bulkWaitTimer) clearTimeout(bulkWaitTimer);
+      bulkWaitTimer = null;
+      bulkWaitResolve = null;
+      $('#stopBulkRework').hidden = true;
+      $('#cancelBulkRework').disabled = false;
+      const successes = bulkReworkResults.filter(result => result.ok).length;
+      const remaining = bulkReworkIds.length - successes;
+      $('#runBulkRework').hidden = remaining === 0;
+      $('#runBulkRework').disabled = false;
+      $('#runBulkRework').textContent = 'Continue remaining';
+      if (!$('#bulkReworkStatus').textContent.startsWith('Paused because')) {
+        $('#bulkReworkStatus').textContent = bulkStopRequested ? 'Stopped. Completed revisions are ready to review; other saved drafts are unchanged.' : `Finished ${successes} of ${bulkReworkIds.length} revisions. Review the results below.`;
+      }
+      renderBulkReworkResults();
+      renderOutreach();
+    }
+  }
+  function applyBulkRework() {
+    if (bulkReworkRunning) return;
+    const checked = new Set([...$('#bulkReworkResults').querySelectorAll('[data-bulk-apply]:checked')].map(input => input.dataset.bulkApply));
+    if (!checked.size) { $('#bulkReworkSummary').textContent = 'Select at least one revision to apply.'; return; }
+    let applied = 0;
+    let skipped = 0;
+    for (const result of bulkReworkResults.filter(item => item.ok && checked.has(item.id))) {
+      const person = state.outreach.find(item => item.id === result.id && item.status === 'draft');
+      if (!person || person.subject !== result.original.subject || person.body !== result.original.body) { skipped++; continue; }
+      person.subject = result.subject;
+      person.body = result.body;
+      person.gmailDraftId = null;
+      person.gmailDraftCreatedAt = null;
+      selectedOutreachIds.delete(person.id);
+      applied++;
+    }
+    if (!applied) { $('#bulkReworkSummary').textContent = 'None applied. A selected draft may have changed; start again to avoid overwriting it.'; return; }
+    persist();
+    renderPeople();
+    $('#bulkReworkDialog').close();
+    bulkReworkIds = [];
+    bulkReworkResults = [];
+    showToast(`${applied} revised email${applied === 1 ? '' : 's'} saved${skipped ? `; ${skipped} changed draft${skipped === 1 ? ' was' : 's were'} skipped` : ''}. Create new Gmail drafts to use these versions there.`);
   }
   function handleAction(action, id) {
     const person = personById(id);
@@ -763,7 +934,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
 
   function openRework(person) {
     if (!api.key) { openSettings(); showToast('Connect your own API key to rework a note.'); return; }
-    if (generatingAll || generatingPeople.size || reworkingPeople.size) { showToast('Wait for the current note to finish first.'); return; }
+    if (generatingAll || generatingPeople.size || reworkingPeople.size || bulkReworkRunning) { showToast('Wait for the current note to finish first.'); return; }
     reworkPersonId = person.id;
     reworkCandidate = null;
     reworkOriginal = { subject: person.subject, body: person.body };
@@ -782,7 +953,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const person = state.outreach.find(item => item.id === reworkPersonId);
     if (!person || person.status !== 'draft') { $('#reworkStatus').textContent = 'This draft is no longer available to rework.'; return; }
     if (!api.key) { $('#reworkDialog').close(); openSettings(); showToast('Connect your own API key to rework a note.'); return; }
-    if (generatingPeople.size || generatingAll || reworkingPeople.size) { $('#reworkStatus').textContent = 'Wait for the current note to finish first.'; return; }
+    if (generatingPeople.size || generatingAll || reworkingPeople.size || bulkReworkRunning) { $('#reworkStatus').textContent = 'Wait for the current note to finish first.'; return; }
     const direction = $('#reworkDirection').value.trim();
     reworkingPeople.add(person.id);
     $('#generateRework').disabled = true;
@@ -848,8 +1019,25 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   $('#peopleList').addEventListener('change', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (card && field) { const person = personById(card.dataset.person); if (person) { person[field] = event.target.value; persist(); } } });
   $('#peopleList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.closest('[data-person]')?.dataset.person); });
   $('#outreachList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.dataset.person); });
+  $('#outreachList').addEventListener('change', event => { const checkbox = event.target.closest('[data-outreach-select]'); if (!checkbox) return; if (checkbox.checked) selectedOutreachIds.add(checkbox.dataset.outreachSelect); else selectedOutreachIds.delete(checkbox.dataset.outreachSelect); renderOutreach(); });
   $('#outreachFilters').addEventListener('click', event => { const button = event.target.closest('[data-outreach-filter]'); if (!button) return; outreachFilter = button.dataset.outreachFilter; renderOutreach(); });
   $('#outreachSearch').addEventListener('input', renderOutreach);
+  $('#selectVisibleDrafts').addEventListener('change', event => { for (const checkbox of $('#outreachList').querySelectorAll('[data-outreach-select]')) { if (event.target.checked) selectedOutreachIds.add(checkbox.dataset.outreachSelect); else selectedOutreachIds.delete(checkbox.dataset.outreachSelect); } renderOutreach(); });
+  $('#clearOutreachSelection').addEventListener('click', () => { if (bulkReworkRunning) return; selectedOutreachIds.clear(); renderOutreach(); });
+  $('#bulkReworkButton').addEventListener('click', openBulkRework);
+  $('#runBulkRework').addEventListener('click', runBulkRework);
+  $('#stopBulkRework').addEventListener('click', requestBulkStop);
+  $('#applyBulkRework').addEventListener('click', applyBulkRework);
+  $('#cancelBulkRework').addEventListener('click', () => $('#bulkReworkDialog').close());
+  $('#bulkReworkResults').addEventListener('change', event => {
+    const checkbox = event.target.closest('[data-bulk-apply]');
+    if (!checkbox) return;
+    const result = bulkReworkResults.find(item => item.id === checkbox.dataset.bulkApply && item.ok);
+    if (result) result.apply = checkbox.checked;
+    const applicableCount = bulkReworkResults.filter(item => item.ok && item.apply).length;
+    $('#applyBulkRework').textContent = `Apply ${applicableCount} selected revision${applicableCount === 1 ? '' : 's'}`;
+  });
+  $('#bulkReworkDialog').addEventListener('cancel', event => { if (bulkReworkRunning) { event.preventDefault(); requestBulkStop(); } });
   $('#addPerson').addEventListener('click', () => { if (state.people.length >= MAX_PEOPLE) return; state.people.push(newPerson()); persist(); renderPeople(); $('#peopleList article:last-child [data-field="name"]').focus(); });
   for (const [id, key] of [['senderName','senderName'], ['senderFocus','senderFocus'], ['senderContext','senderContext'], ['senderSignature','senderSignature']]) $(`#${id}`).addEventListener('input', event => { state[key] = event.target.value.slice(0, key === 'senderSignature' ? 500 : 3000); if (event.target.value.length > state[key].length) event.target.value = state[key]; persist(); });
   $('#customPrompt').addEventListener('input', event => { state.customPrompt = event.target.value.slice(0, 500); if (event.target.value.length > 500) event.target.value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; persist(); });
