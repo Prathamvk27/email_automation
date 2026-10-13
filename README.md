@@ -16,6 +16,8 @@ Use **Test connection**, then **Save settings**. By default, the key remains in 
 
 Each person is drafted with two API calls: the first extracts grounded facts and missing-information constraints; the second writes a subject and body. The app processes contacts one at a time and never sends an email automatically. After a successful draft, its contact entry clears from Compose and the complete message is saved under **Outreach** for later review, copying, or opening in a prefilled Gmail compose window. Generated drafts and contact/profile information are stored in the browser's local storage. Use **Export list** to save a CSV backup.
 
+Use **Rework** on any saved draft to request a one-off revision or ask for a fresh rewrite. The revised subject and body appear for review first; the saved version changes only after you choose **Use this version**. Reworking uses the same contact, job details, profile, and writing style, and makes two more model calls.
+
 For job outreach, enter the contact and company, then add the exact job title, job ID, and (optionally) paste the job description. The writing agent treats the posting as the employer's requirements, matches one relevant requirement to evidence from your profile, and states your intent to be considered for that opening. It does not treat the job description as proof of your experience. Set a reusable signature in **My profile**; the app appends it exactly after generation, or uses `Best,` and your saved name if you leave the signature blank. The pasted job description is sent to your selected model provider when you generate the email.
 
 ## Evaluate the writing agent
@@ -57,6 +59,7 @@ The model provider must allow browser requests from the site (CORS). The API key
 
 - Up to 25 separate recipients; write a note for one person or generate the whole batch.
 - Successful drafts move out of the Compose form into Outreach, where the full message remains available after a refresh.
+- Rework an individual saved draft with an optional revision instruction, review the proposed version, then apply it.
 - Role, company, recipient context, sender profile, and optional writing direction.
 - A separate Writing styles library with Natural and Abigayle framing methods, plus up to 20 editable custom methods. The selected style is applied to single-person and batch drafts.
 - A separate **My profile** page for up to 10 reusable project stories per target role; the writer selects at most one relevant story per email.

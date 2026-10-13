@@ -26,11 +26,15 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   }
   const mobileSidebar = window.matchMedia('(max-width: 790px)');
   const generatingPeople = new Set();
+  const reworkingPeople = new Set();
   let generatingAll = false;
   let queueTimer = null;
   let queueWake = null;
   let queueLoopActive = false;
   let editingStyleId = null;
+  let reworkPersonId = '';
+  let reworkCandidate = null;
+  let reworkOriginal = null;
   let toastTimer;
 
   function loadState() {
@@ -226,7 +230,8 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     $('#outreachList').innerHTML = items.map(person => {
       const isDue = person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date();
       const status = person.status === 'replied' ? '<span class="status-pill replied">Reply received</span>' : person.status === 'sent' ? `<span class="status-pill ${isDue ? 'due' : ''}">${person.replyCheck === 'no_reply' ? 'No reply yet · check ' : isDue ? 'Follow-up due' : 'Follow up '}${new Date(person.followUpAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : '<span class="status-pill">Draft ready</span>';
-      const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>` : `<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>`;
+      const reworkAction = person.status === 'draft' && person.subject && person.body ? `<button class="small-action" data-action="rework" data-person="${esc(person.id)}" ${reworkingPeople.has(person.id) ? 'disabled' : ''}>${reworkingPeople.has(person.id) ? 'Reworking…' : 'Rework'}</button>` : '';
+      const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>` : `${reworkAction}<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>`;
       const resumeAction = `<button class="small-action primary" data-action="gmail-draft" data-person="${esc(person.id)}" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}`;
       return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.jobTitle || person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}${person.jobId ? ` · Job ID ${esc(person.jobId)}` : ''}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
@@ -497,14 +502,17 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const roleProfile = person.role ? (state.roleProfiles[person.role] || []).filter(story => [story.title, story.built, story.why, story.how, story.result].some(value => value.trim())) : [];
     return {
       senderName: state.senderName.trim(), senderFocus: state.senderFocus.trim(), senderExperience: state.senderContext.trim(),
-      roleProfile, framingStyle: state.selectedStyleId || 'natural', voiceGuide: (state.voiceGuide || '').trim(),
+      roleProfile, framingStyle: person.framingStyleId || state.selectedStyleId || 'natural', voiceGuide: (state.voiceGuide || '').trim(),
       senderSignature: state.senderSignature.trim(), recipientName: person.name.trim(), targetRole: person.role, company: person.company.trim(),
       jobTitle: (person.jobTitle || '').trim(), jobId: (person.jobId || '').trim(), jobDescription: (person.jobDescription || '').trim().slice(0, 6000), recipientContext: person.context.trim(), customDirection: state.customPrompt.trim()
     };
   }
-  async function generatePerson(person) {
+  async function generatePerson(person, revision = {}) {
     const context = buildContext(person);
+    context.revisionDirection = String(revision.direction || '').trim();
+    context.previousDraft = revision.previousDraft || null;
     const result = await runGoodsendAgent({ context, styleInstruction: getWritingStyle(context.framingStyle).instructions, requestCompletion });
+    person.framingStyleId = context.framingStyle;
     person.subject = ensureJobSubject(result.subject.trim(), context.jobTitle, context.jobId);
     const bodyWithGreeting = ensureGreeting(result.body.trim(), context.recipientName);
     const bodyWithApplicationDetails = ensureJobDetails(bodyWithGreeting, context.jobTitle, context.jobId);
@@ -701,10 +709,81 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     if (action === 'copy-body') copyText(person.body, 'Message');
     if (action === 'copy-all') copyText(`Subject: ${person.subject}\n\n${person.body}`, 'Subject and message');
     if (action === 'compose') compose(person);
+    if (action === 'rework') openRework(person);
     if (action === 'gmail-draft') createGmailDraftWithResume(person);
     if (action === 'mark-sent') markSent(person);
     if (action === 'replied') { person.status = 'replied'; person.repliedAt = new Date().toISOString(); persist(); renderPeople(); showToast('Reply recorded. Nice.'); }
     if (action === 'no-reply') { person.replyCheck = 'no_reply'; person.followUpAt = new Date(Date.now() + FOLLOW_UP_DAYS * 86400000).toISOString(); persist(); renderPeople(); showToast('No reply yet. We’ll remind you to check again in two days.'); }
+  }
+
+  function openRework(person) {
+    if (!api.key) { openSettings(); showToast('Connect your own API key to rework a note.'); return; }
+    if (generatingAll || generatingPeople.size || reworkingPeople.size) { showToast('Wait for the current note to finish first.'); return; }
+    reworkPersonId = person.id;
+    reworkCandidate = null;
+    reworkOriginal = { subject: person.subject, body: person.body };
+    $('#reworkDirection').value = '';
+    $('#reworkStatus').textContent = '';
+    $('#reworkPreview').hidden = true;
+    $('#generateRework').hidden = false;
+    $('#generateRework').disabled = false;
+    $('#generateRework').textContent = 'Generate revision';
+    $('#applyRework').hidden = true;
+    $('#reworkDialog').showModal();
+    $('#reworkDirection').focus();
+  }
+
+  async function generateRework() {
+    const person = state.outreach.find(item => item.id === reworkPersonId);
+    if (!person || person.status !== 'draft') { $('#reworkStatus').textContent = 'This draft is no longer available to rework.'; return; }
+    if (!api.key) { $('#reworkDialog').close(); openSettings(); showToast('Connect your own API key to rework a note.'); return; }
+    if (generatingPeople.size || generatingAll || reworkingPeople.size) { $('#reworkStatus').textContent = 'Wait for the current note to finish first.'; return; }
+    const direction = $('#reworkDirection').value.trim();
+    reworkingPeople.add(person.id);
+    $('#generateRework').disabled = true;
+    $('#generateRework').textContent = 'Reworking…';
+    $('#reworkStatus').textContent = 'Generating a new version. Your saved draft stays unchanged until you apply it.';
+    $('#reworkPreview').hidden = true;
+    $('#applyRework').hidden = true;
+    renderOutreach();
+    try {
+      const candidate = { ...person };
+      await generatePerson(candidate, { direction, previousDraft: reworkOriginal });
+      reworkCandidate = { subject: candidate.subject, body: candidate.body };
+      $('#reworkSubject').value = candidate.subject;
+      $('#reworkBody').value = candidate.body;
+      $('#reworkPreview').hidden = false;
+      $('#generateRework').hidden = true;
+      $('#applyRework').hidden = false;
+      $('#reworkStatus').textContent = 'Review the revision. Your current saved draft is still unchanged.';
+    } catch (error) {
+      $('#reworkStatus').textContent = error.message || 'Could not rework this note. Your saved draft is unchanged.';
+      $('#generateRework').disabled = false;
+      $('#generateRework').textContent = 'Try again';
+    } finally {
+      reworkingPeople.delete(person.id);
+      renderOutreach();
+    }
+  }
+
+  function applyRework() {
+    const person = state.outreach.find(item => item.id === reworkPersonId);
+    if (!person || person.status !== 'draft' || !reworkCandidate) return;
+    if (person.subject !== reworkOriginal?.subject || person.body !== reworkOriginal?.body) {
+      $('#reworkStatus').textContent = 'This saved draft changed while the revision was being prepared. Close this and start again so no edits are lost.';
+      $('#applyRework').hidden = true;
+      return;
+    }
+    person.subject = reworkCandidate.subject;
+    person.body = reworkCandidate.body;
+    person.gmailDraftId = null;
+    person.gmailDraftCreatedAt = null;
+    persist();
+    renderPeople();
+    $('#reworkDialog').close();
+    reworkCandidate = null;
+    reworkOriginal = null;
+    showToast('Revised email saved. Create a new Gmail draft if you want to use this version there.');
   }
 
   renderPeople();
@@ -804,6 +883,9 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   });
   $('#saveStyle').addEventListener('click', saveWritingStyle);
   $('#cancelStyle').addEventListener('click', () => $('#styleDialog').close());
+  $('#generateRework').addEventListener('click', generateRework);
+  $('#applyRework').addEventListener('click', applyRework);
+  $('#cancelRework').addEventListener('click', () => $('#reworkDialog').close());
   $('#openSettings').addEventListener('click', openSettings); $('#topSettings').addEventListener('click', openSettings); $('#configureApi').addEventListener('click', openSettings);
   $('#sidebarToggle').addEventListener('click', toggleSidebar);
   $('#sidebarBackdrop').addEventListener('click', () => { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); });
