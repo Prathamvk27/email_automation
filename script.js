@@ -1,3 +1,5 @@
+import { runGoodsendAgent } from './goodsend-agent.mjs';
+
 (() => {
   const STORE_KEY = 'goodsend.workspace.v1';
   const API_PREFS_KEY = 'goodsend.api.preferences.v1';
@@ -25,6 +27,9 @@
   const mobileSidebar = window.matchMedia('(max-width: 790px)');
   const generatingPeople = new Set();
   let generatingAll = false;
+  let queueTimer = null;
+  let queueWake = null;
+  let queueLoopActive = false;
   let editingStyleId = null;
   let toastTimer;
 
@@ -42,10 +47,11 @@
       const priorOutreach = Array.isArray(saved.outreach) ? saved.outreach : [];
       const archivedPeople = people.filter(person => person.subject || person.body || person.status !== 'draft');
       const composePeople = people.filter(person => !person.subject && !person.body && person.status === 'draft');
-      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', roleProfiles, roleProfileEditorRole, roleProfileEditorStoryId, writingStyles, selectedStyleId, people: composePeople.length ? composePeople : [newPerson()], outreach: [...archivedPeople, ...priorOutreach] };
+      const queue = saved.queue && Array.isArray(saved.queue.ids) ? { ids: saved.queue.ids.filter(id => typeof id === 'string'), index: Math.max(0, Number(saved.queue.index) || 0), status: saved.queue.status === 'running' ? 'paused' : ['paused', 'complete', 'stopped'].includes(saved.queue.status) ? saved.queue.status : 'paused', interval: [30, 45, 60, 90].includes(Number(saved.queue.interval)) ? Number(saved.queue.interval) : 30, pauseReason: typeof saved.queue.pauseReason === 'string' ? saved.queue.pauseReason : '', nextRunAt: 0 } : null;
+      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', voiceGuide: typeof saved.voiceGuide === 'string' ? saved.voiceGuide.slice(0, 1000) : '', queueIntervalSeconds: [30, 45, 60, 90].includes(Number(saved.queueIntervalSeconds)) ? Number(saved.queueIntervalSeconds) : 30, queue, roleProfiles, roleProfileEditorRole, roleProfileEditorStoryId, writingStyles, selectedStyleId, people: composePeople.length ? composePeople : [newPerson()], outreach: [...archivedPeople, ...priorOutreach] };
     } catch {
       const roleProfiles = normalizeRoleProfiles({});
-      return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles, roleProfileEditorRole: roles[0], roleProfileEditorStoryId: roleProfiles[roles[0]][0].id, writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] };
+      return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', voiceGuide: '', queueIntervalSeconds: 30, queue: null, roleProfiles, roleProfileEditorRole: roles[0], roleProfileEditorStoryId: roleProfiles[roles[0]][0].id, writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] };
     }
   }
   function normalizeWritingStyles(styles) {
@@ -107,7 +113,36 @@
       ${person.subject || person.body ? `<div class="draft-box"><div class="draft-fields"><label>Subject<input data-field="subject" value="${esc(person.subject)}" placeholder="Subject" /></label><label>Message<textarea data-field="body" placeholder="Your note">${esc(person.body)}</textarea></label></div><div class="draft-actions"><button class="small-action" data-action="copy-subject">Copy subject</button><button class="small-action" data-action="copy-body">Copy body</button><button class="small-action" data-action="copy-all">Copy both</button><button class="small-action primary" data-action="compose">Open in Gmail ↗</button><button class="small-action" data-action="gmail-draft" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}</div></div>` : ''}
       ${person.error ? `<div class="draft-error">${esc(person.error)}</div>` : ''}
     </article>`).join('');
+    if (state.queue?.status === 'running') list.querySelectorAll('input, select, textarea, button[data-action="remove"]').forEach(control => { control.disabled = true; });
+    renderQueue();
     updateSummary();
+  }
+  function renderQueue() {
+    const queue = state.queue;
+    const start = $('#generateAll');
+    const pause = $('#pauseQueue');
+    const stop = $('#stopQueue');
+    const interval = $('#queueInterval');
+    interval.value = String(state.queueIntervalSeconds || 30);
+    const active = queue?.status === 'running';
+    const paused = queue?.status === 'paused' && queue.index < queue.ids.length;
+    start.querySelector('b').textContent = active ? 'Queue running' : paused ? 'Resume paced run' : queue?.status === 'complete' ? 'Run another batch' : 'Start paced run';
+    start.disabled = active || generatingPeople.size > 0;
+    pause.hidden = !active;
+    stop.hidden = !active && !paused;
+    interval.disabled = active;
+    if (active) {
+      const remaining = Math.max(0, queue.ids.length - queue.index);
+      $('#queueStatus').textContent = queue.nextRunAt ? `Draft ${Math.min(queue.index + 1, queue.ids.length)} of ${queue.ids.length} is queued. Next contact in ${Math.max(0, Math.ceil((queue.nextRunAt - Date.now()) / 1000))} seconds. ${remaining} remaining.` : `Writing contact ${Math.min(queue.index + 1, queue.ids.length)} of ${queue.ids.length}…`;
+    } else if (paused) {
+      $('#queueStatus').textContent = `${queue.pauseReason ? `${queue.pauseReason} ` : ''}Paused · ${queue.index} of ${queue.ids.length} processed. Resume to continue; saved contacts and drafts stay in this browser.`;
+    } else if (queue?.status === 'complete') {
+      $('#queueStatus').textContent = `Run complete · every contact was attempted. Successful drafts are in Outreach; any errors remain in Compose.`;
+    } else if (queue?.status === 'stopped') {
+      $('#queueStatus').textContent = `Stopped · remaining contacts are still in Compose and can be run later.`;
+    } else {
+      $('#queueStatus').textContent = 'Ready when you are. Your contact details stay attached to each saved draft.';
+    }
   }
   function renderRoleProfile() {
     const rolePicker = $('#roleProfileRole');
@@ -190,7 +225,7 @@
       const status = person.status === 'replied' ? '<span class="status-pill replied">Reply received</span>' : person.status === 'sent' ? `<span class="status-pill ${isDue ? 'due' : ''}">${person.replyCheck === 'no_reply' ? 'No reply yet · check ' : isDue ? 'Follow-up due' : 'Follow up '}${new Date(person.followUpAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : '<span class="status-pill">Draft ready</span>';
       const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>` : `<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>`;
       const resumeAction = `<button class="small-action" data-action="email-with-resume" data-person="${esc(person.id)}">Download email + resume</button><button class="small-action primary" data-action="gmail-draft" data-person="${esc(person.id)}" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}`;
-      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.role, person.company].filter(Boolean).join(' · ') || person.email || 'Role not set')}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
+      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
   }
   function showToast(message) {
@@ -503,43 +538,127 @@
     const roleProfile = person.role ? (state.roleProfiles[person.role] || []).filter(story => [story.title, story.built, story.why, story.how, story.result].some(value => value.trim())) : [];
     return {
       senderName: state.senderName.trim(), senderFocus: state.senderFocus.trim(), senderExperience: state.senderContext.trim(),
-      roleProfile, framingStyle: state.selectedStyleId || 'natural',
+      roleProfile, framingStyle: state.selectedStyleId || 'natural', voiceGuide: (state.voiceGuide || '').trim(),
       recipientName: person.name.trim(), targetRole: person.role, company: person.company.trim(), recipientContext: person.context.trim(), customDirection: state.customPrompt.trim()
     };
   }
   async function generatePerson(person) {
     const context = buildContext(person);
-    const factPrompt = `You are a careful outreach writing assistant. Use only the information below. Return a short grounded fact sheet and a separate list of anything that must not be claimed. Keep separate project stories distinct; do not combine their facts. Do not infer achievements, relationships, company facts, or experience. Missing information must stay missing.\n\n${JSON.stringify(context)}`;
-    const facts = await requestCompletion([{ role: 'system', content: 'Extract grounded facts for a personal cold email. Keep each project story separate and never invent facts.' }, { role: 'user', content: factPrompt }], 0.2);
-    const styleInstruction = getWritingStyle(context.framingStyle).instructions;
-    const draftPrompt = `Write one concise, warm, human cold outreach email based only on this context and fact sheet. Choose at most one role-specific project story, selecting the one most relevant to this contact's role and context. Do not merge separate projects or try to include every story. Avoid generic flattery, fake familiarity, exaggerated claims, and salesy language. Use a natural greeting and one small, clear ask. Aim for 75–125 words unless the optional direction says otherwise. ${styleInstruction} Return ONLY valid JSON with exactly two string fields: subject and body. No markdown fences.\n\nContext: ${JSON.stringify(context)}\nGrounded fact sheet: ${facts}`;
-    const raw = await requestCompletion([{ role: 'system', content: 'You write thoughtful, specific outreach emails that sound like a real person. Follow the required JSON format.' }, { role: 'user', content: draftPrompt }], 0.75);
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-    let result;
-    try { result = JSON.parse(cleaned); } catch { throw new Error('Could not read the draft from the API. Try generating again.'); }
-    if (typeof result.subject !== 'string' || typeof result.body !== 'string' || !result.subject.trim() || !result.body.trim()) throw new Error('The API response needs a subject and body. Try again.');
+    const result = await runGoodsendAgent({ context, styleInstruction: getWritingStyle(context.framingStyle).instructions, requestCompletion });
     person.subject = result.subject.trim(); person.body = result.body.trim(); person.status = 'draft'; person.sentAt = null; person.followUpAt = null; person.error = '';
   }
-  async function generateAll() {
-    if (!api.key) { openSettings(); showToast('Connect your own API key to write notes.'); return; }
-    if (generatingAll || generatingPeople.size) { showToast('Wait for the current note to finish writing.'); return; }
-    const candidates = state.people.filter(person => person.email || person.name || person.role || person.company || person.context);
-    if (!candidates.length) { showToast('Add a person before writing notes.'); return; }
-    const invalid = candidates.find(person => !validEmail(person.email));
-    if (invalid) { showToast(`Add a valid email for ${invalid.name || 'each person'} first.`); document.querySelector(`[data-person="${CSS.escape(invalid.id)}"] [data-field="email"]`)?.focus(); return; }
-    const duplicate = candidates.find((person, index) => candidates.findIndex(other => other.email.toLowerCase() === person.email.toLowerCase()) !== index);
-    if (duplicate) { showToast('Each person needs a unique email address.'); return; }
-    const button = $('#generateAll'); button.disabled = true; generatingAll = true; renderPeople();
-    for (let index = 0; index < candidates.length; index++) {
-      const person = candidates[index]; person.error = ''; button.querySelector('b').textContent = `Writing ${index + 1} of ${candidates.length}…`; renderPeople();
-      try { await generatePerson(person); archiveGeneratedPerson(person); }
-      catch (error) { person.error = error.message || 'Something went wrong while generating this note.'; }
-      persist(); renderPeople();
+  function waitForQueue(ms) {
+    return new Promise(resolve => {
+      queueWake = resolve;
+      queueTimer = setTimeout(() => { queueTimer = null; queueWake = null; resolve(); }, ms);
+    });
+  }
+  function wakeQueue() {
+    if (queueTimer) clearTimeout(queueTimer);
+    queueTimer = null;
+    const wake = queueWake;
+    queueWake = null;
+    wake?.();
+  }
+  async function runQueue() {
+    if (queueLoopActive || !state.queue || state.queue.status !== 'running') return;
+    queueLoopActive = true;
+    generatingAll = true;
+    try {
+      while (state.queue?.status === 'running' && state.queue.index < state.queue.ids.length) {
+        const queue = state.queue;
+        const person = state.people.find(item => item.id === queue.ids[queue.index]);
+        if (!person) { queue.index++; persist(); continue; }
+        if (!validEmail(person.email)) {
+          person.error = `Skipped: add a valid email address${person.name ? ` for ${person.name}` : ''}, then run this contact separately.`;
+          queue.index++;
+          persist(); renderPeople();
+        } else {
+          person.error = '';
+          generatingPeople.add(person.id);
+          let retryCurrent = false;
+          renderPeople();
+          try {
+            await generatePerson(person);
+            archiveGeneratedPerson(person);
+          } catch (error) {
+            person.error = error.message || 'Something went wrong while generating this note.';
+            if (/(?:\b429\b|rate.?limit|too many requests)/i.test(person.error)) {
+              retryCurrent = true;
+              if (queue.status === 'running') {
+                queue.pauseReason = 'The model provider rate-limited this run. Wait for its limit window, then resume to retry this contact.';
+                queue.status = 'paused';
+                queue.nextRunAt = 0;
+              }
+            }
+          } finally {
+            generatingPeople.delete(person.id);
+            if (!retryCurrent) queue.index++;
+            persist(); renderPeople();
+          }
+        }
+        if (queue.status !== 'running') break;
+        if (queue.index < queue.ids.length) {
+          queue.nextRunAt = Date.now() + queue.interval * 1000;
+          persist(); renderQueue();
+          await waitForQueue(queue.interval * 1000);
+          queue.nextRunAt = 0;
+          persist(); renderQueue();
+        }
+      }
+      if (state.queue?.status === 'running' && state.queue.index >= state.queue.ids.length) {
+        state.queue.status = 'complete';
+        state.queue.nextRunAt = 0;
+        ensureComposeRow();
+        persist();
+        showToast('Paced run complete. Generated drafts are saved in Outreach.');
+      }
+      if (state.queue?.status === 'stopped' && state.queue.index >= state.queue.ids.length) ensureComposeRow();
+    } finally {
+      generatingAll = false;
+      queueLoopActive = false;
+      renderPeople();
     }
-    ensureComposeRow();
-    generatingAll = false; button.disabled = false; button.querySelector('b').textContent = 'Write my notes'; renderPeople();
-    const ready = candidates.filter(person => person.subject && person.body).length;
-    showToast(ready ? `${ready} ${ready === 1 ? 'note is' : 'notes are'} saved in Outreach.` : 'No notes were generated. Check your API settings.');
+  }
+  function generateAll() {
+    if (!api.key) { openSettings(); showToast('Connect your own API key to write notes.'); return; }
+    if (generatingPeople.size) { showToast('Wait for the current note to finish writing.'); return; }
+    if (state.queue?.status === 'running') return;
+    const pausedQueue = state.queue?.status === 'paused' && state.queue.index < state.queue.ids.length;
+    if (pausedQueue) {
+      state.queue.status = 'running';
+      state.queue.pauseReason = '';
+      state.queue.nextRunAt = 0;
+    } else {
+      const candidates = state.people.filter(person => person.email || person.name || person.role || person.company || person.context);
+      if (!candidates.length) { showToast('Add a person before writing notes.'); return; }
+      const seen = new Set();
+      for (const person of candidates) {
+        const normalizedEmail = person.email.trim().toLowerCase();
+        if (validEmail(normalizedEmail) && seen.has(normalizedEmail)) { showToast(`There are duplicate contact emails: ${normalizedEmail}. Keep each contact address unique.`); return; }
+        if (validEmail(normalizedEmail)) seen.add(normalizedEmail);
+      }
+      state.queue = { ids: candidates.map(person => person.id), index: 0, status: 'running', interval: state.queueIntervalSeconds || 30, pauseReason: '', nextRunAt: 0 };
+    }
+    persist(); renderQueue();
+    void runQueue();
+  }
+  function pauseQueue() {
+    if (!state.queue || state.queue.status !== 'running') return;
+    state.queue.status = 'paused';
+    state.queue.nextRunAt = 0;
+    persist();
+    wakeQueue();
+    renderQueue();
+  }
+  function stopQueue() {
+    if (!state.queue || !['running', 'paused'].includes(state.queue.status)) return;
+    state.queue.status = 'stopped';
+    state.queue.nextRunAt = 0;
+    persist();
+    wakeQueue();
+    renderQueue();
+    if (!queueLoopActive) renderPeople();
   }
   async function generateOne(person) {
     if (!api.key) { openSettings(); showToast('Connect your own API key to write notes.'); return; }
@@ -598,7 +717,8 @@
 
   renderPeople();
   window.setInterval(updateSummary, 60000);
-  $('#senderName').value = state.senderName; $('#senderFocus').value = state.senderFocus; $('#senderContext').value = state.senderContext; $('#customPrompt').value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`;
+  window.setInterval(() => { if (state.queue?.status === 'running' && state.queue.nextRunAt) renderQueue(); }, 1000);
+  $('#senderName').value = state.senderName; $('#senderFocus').value = state.senderFocus; $('#senderContext').value = state.senderContext; $('#customPrompt').value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; $('#voiceGuide').value = state.voiceGuide || ''; $('#voiceGuideChars').textContent = `${(state.voiceGuide || '').length} / 1000`;
   setApiStatus();
   updateSidebar();
   renderRoleProfile();
@@ -615,6 +735,10 @@
   $('#addPerson').addEventListener('click', () => { if (state.people.length >= MAX_PEOPLE) return; state.people.push(newPerson()); persist(); renderPeople(); $('#peopleList article:last-child [data-field="name"]').focus(); });
   for (const [id, key] of [['senderName','senderName'], ['senderFocus','senderFocus'], ['senderContext','senderContext']]) $(`#${id}`).addEventListener('input', event => { state[key] = event.target.value; persist(); });
   $('#customPrompt').addEventListener('input', event => { state.customPrompt = event.target.value.slice(0, 500); if (event.target.value.length > 500) event.target.value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; persist(); });
+  $('#voiceGuide').addEventListener('input', event => { state.voiceGuide = event.target.value.slice(0, 1000); if (event.target.value.length > 1000) event.target.value = state.voiceGuide; $('#voiceGuideChars').textContent = `${state.voiceGuide.length} / 1000`; persist(); });
+  $('#queueInterval').addEventListener('change', event => { state.queueIntervalSeconds = [30, 45, 60, 90].includes(Number(event.target.value)) ? Number(event.target.value) : 30; if (state.queue?.status === 'paused') state.queue.interval = state.queueIntervalSeconds; persist(); renderQueue(); });
+  $('#pauseQueue').addEventListener('click', pauseQueue);
+  $('#stopQueue').addEventListener('click', stopQueue);
   $('#roleProfileRole').addEventListener('change', event => {
     state.roleProfileEditorRole = event.target.value;
     state.roleProfileEditorStoryId = state.roleProfiles[state.roleProfileEditorRole][0].id;
@@ -696,5 +820,5 @@
   window.addEventListener('hashchange', updatePage);
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv);
-  $('#clearOutreach').addEventListener('click', () => { if (!confirm('Clear every person, draft, profile, follow-up, and saved resume from this browser? This cannot be undone.')) return; localStorage.removeItem(STORE_KEY); deleteResumeFile().then(renderResumeStatus).catch(() => {}); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', roleProfiles: normalizeRoleProfiles({}), roleProfileEditorRole: roles[0], roleProfileEditorStoryId: '', writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; state.roleProfileEditorStoryId = state.roleProfiles[roles[0]][0].id; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; renderRoleProfile(); renderResumeStatus(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
+  $('#clearOutreach').addEventListener('click', () => { if (queueLoopActive || generatingPeople.size) { showToast('Wait for the current draft to finish, then clear the workspace.'); return; } if (!confirm('Clear every person, draft, profile, follow-up, and saved resume from this browser? This cannot be undone.')) return; wakeQueue(); localStorage.removeItem(STORE_KEY); deleteResumeFile().then(renderResumeStatus).catch(() => {}); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', voiceGuide: '', queueIntervalSeconds: 30, queue: null, roleProfiles: normalizeRoleProfiles({}), roleProfileEditorRole: roles[0], roleProfileEditorStoryId: '', writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; state.roleProfileEditorStoryId = state.roleProfiles[roles[0]][0].id; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; $('#voiceGuide').value = ''; $('#voiceGuideChars').textContent = '0 / 1000'; renderRoleProfile(); renderResumeStatus(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
 })();

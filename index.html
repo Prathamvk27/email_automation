@@ -65,7 +65,11 @@
           <aside class="right-column">
             <section class="panel recipe-panel"><div class="recipe-top"><span class="recipe-icon">✦</span><span>THE GOOD NOTE METHOD</span></div><h3>Human first.<br /><em>Helpful always.</em></h3><div class="recipe-rule"></div><ul><li><span>01</span> Use details that are true</li><li><span>02</span> Make one clear, small ask</li><li><span>03</span> Leave room for a real reply</li></ul><div class="recipe-stamp">MADE FOR<br />REAL PEOPLE <b>↗</b></div></section>
             <section class="panel api-panel"><div class="api-heading"><span class="api-pulse" id="apiPulse"></span><div><h3>Writing assistant</h3><p id="apiStatus">Add your API details to begin</p></div></div><button class="outline-button" id="configureApi">Set up API <span>↗</span></button><div class="two-pass"><span>✳</span><span><b>Two thoughtful passes</b><small>Shape the message, then smooth the voice.</small></span></div></section>
-            <button class="generate-button" id="generateAll"><span class="generate-star">✳</span><span><b>Write my notes</b><small>Generate all drafts</small></span><span class="generate-arrow">↗</span></button>
+          <div class="queue-panel panel" aria-label="Paced draft queue">
+            <div class="queue-heading"><div><strong>Draft queue</strong><p>Write one contact at a time, with a cooldown between contacts.</p></div><label>Wait between drafts<select id="queueInterval"><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">1 minute</option><option value="90">90 seconds</option></select></label></div>
+            <div class="queue-controls"><button class="generate-button" id="generateAll"><span class="generate-star">✳</span><span><b>Start paced run</b><small>Drafts only · no emails are sent</small></span><span class="generate-arrow">↗</span></button><button class="outline-button" id="pauseQueue" type="button" hidden>Pause</button><button class="outline-button" id="stopQueue" type="button" hidden>Stop</button></div>
+            <p class="queue-status" id="queueStatus" role="status" aria-live="polite">Ready when you are. The wait reduces request bursts, but provider limits vary. Keep this tab open while the queue runs.</p>
+          </div>
             <p class="generation-note">You review every note before sending.<br />Nothing goes out automatically.</p>
           </aside>
         </section>
@@ -116,6 +120,7 @@
         <section class="styles-page" id="stylesPage" aria-labelledby="stylesPageTitle" hidden>
           <div class="profile-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> SHAPE YOUR VOICE</div><h1 id="stylesPageTitle">Writing styles</h1><p>Choose a framing method for new drafts, or create up to 20 of your own. Styles guide how the model writes; your profile remains the source of personal facts.</p></div><button class="outline-button" id="addWritingStyle">＋ Add a method</button></div>
           <div class="style-library-intro"><span>✳</span><div><strong>Your active method applies to each person you draft.</strong><p>Saved here in this browser and included automatically when you write one note or a batch.</p></div></div>
+          <section class="voice-guide panel"><label for="voiceGuide"><strong>Your reusable voice guide</strong><span>Set preferences that should shape every new email. Keep personal facts in My profile; keep one-off requests in Compose.</span></label><textarea id="voiceGuide" maxlength="1000" rows="4" placeholder="Example: Sound direct and curious, like a thoughtful note to a colleague. Prefer short sentences. Avoid hype and formal phrases. Don't use an em dash."></textarea><div class="prompt-foot"><span>Applied to every new draft</span><span id="voiceGuideChars">0 / 1000</span></div></section>
           <div class="style-library" id="writingStylesList"></div>
         </section>
       </main>
@@ -125,6 +130,6 @@
     <dialog id="styleDialog" class="settings-dialog style-dialog"><form method="dialog" id="styleForm"><div class="dialog-head"><div><span class="step">CUSTOM METHOD</span><h2 id="styleDialogTitle">Add a writing method</h2><p>Describe the structure or voice you want the model to use. Your saved profile provides the facts.</p></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>Method name<input id="styleName" maxlength="40" placeholder="e.g. Curious builder" required /></label><label>Writing instructions<textarea id="styleInstructions" rows="6" maxlength="700" placeholder="For each project sentence, state what I built, why it mattered, how I approached it, and the result. Keep it natural and specific. Never invent details." required></textarea></label><p class="dialog-foot">Keep instructions focused on tone, structure, and length. Do not add personal facts here; save those in My profile.</p><div class="dialog-actions"><button class="text-button" id="cancelStyle" type="button">Cancel</button><button class="outline-button" id="saveStyle" type="button">Save method</button></div></form></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="script.js?v=gmail-attachment-drafts-1"></script>
+    <script type="module" src="script.js?v=agent-harness-1"></script>
   </body>
 </html>

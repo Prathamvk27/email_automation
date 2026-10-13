@@ -16,6 +16,25 @@ Use **Test connection**, then **Save settings**. By default, the key remains in 
 
 Each person is drafted with two API calls: the first extracts grounded facts and missing-information constraints; the second writes a subject and body. The app processes contacts one at a time and never sends an email automatically. After a successful draft, its contact entry clears from Compose and the complete message is saved under **Outreach** for later review, copying, or opening in a prefilled Gmail compose window. Generated drafts and contact/profile information are stored in the browser's local storage. Use **Export list** to save a CSV backup.
 
+## Evaluate the writing agent
+
+god send shares its two-step prompt and JSON parsing code with a small command-line evaluation harness. From the repository root, run the offline fixture first:
+
+```bash
+node harness/run.mjs
+```
+
+The offline fixture makes no network calls or model claims. It checks that both agent stages execute, the output parses, and the scorer/report path works. To evaluate a configured OpenAI-compatible model on the same synthetic cases, opt in explicitly:
+
+```bash
+GOODSEND_API_KEY='your-personal-key' \
+GOODSEND_API_BASE='https://api.openai.com/v1' \
+GOODSEND_MODEL='gpt-4o-mini' \
+node harness/run.mjs --live
+```
+
+Each live case makes two sequential completion calls, so the included four-case suite uses eight calls. Results are written under the ignored `artifacts/goodsend-evals/` folder and include generated text for human review; fixture data is invented. The rule-based checks cover JSON shape, length bounds, required personalization, disallowed claims, and the two-stage path. They are a regression aid, not a reliable semantic judge or evidence of production quality. Review the generated messages before comparing models. Use only a personal key with suitable limits.
+
 ## GitHub Pages
 
 The repository includes a GitHub Actions workflow to publish this folder as a Pages site. Push the files to the `main` branch of the `email_automation` repository, then in GitHub open **Settings → Pages** and select **GitHub Actions** as the build and deployment source. The workflow publishes on future pushes to `main`.
