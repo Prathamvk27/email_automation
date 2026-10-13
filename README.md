@@ -69,4 +69,5 @@ The model provider must allow browser requests from the site (CORS). The API key
 - A separate **My profile** page for up to 10 reusable project stories per target role; the writer selects at most one relevant story per email.
 - An optional saved resume, Gmail OAuth connection, and a Gmail API action to create a reviewable draft with the resume attached.
 - Editable subject and body with copy buttons and a prefilled Gmail compose link (recipient, subject, and body).
+- Generated subjects and bodies preserve the entered capitalization of recipient and sender names, companies, job titles, and job IDs.
 - Local outreach tracker with a two-day follow-up date, reply status, and CSV export.

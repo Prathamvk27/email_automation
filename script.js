@@ -729,10 +729,20 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     context.previousDraft = revision.previousDraft || null;
     const result = await runGoodsendAgent({ context, styleInstruction: getWritingStyle(context.framingStyle).instructions, requestCompletion });
     person.framingStyleId = context.framingStyle;
-    person.subject = ensureJobSubject(result.subject.trim(), context.jobTitle, context.jobId);
+    person.subject = restoreReferenceCapitalization(ensureJobSubject(result.subject.trim(), context.jobTitle, context.jobId), [context.recipientName, context.senderName, context.company, context.jobTitle, context.jobId]);
     const bodyWithGreeting = ensureGreeting(result.body.trim(), context.recipientName);
     const bodyWithApplicationDetails = ensureJobDetails(bodyWithGreeting, context.jobTitle, context.jobId);
-    person.body = addSignature(bodyWithApplicationDetails, context.senderSignature, context.senderName); person.status = 'draft'; person.sentAt = null; person.followUpAt = null; person.error = '';
+    person.body = restoreReferenceCapitalization(addSignature(bodyWithApplicationDetails, context.senderSignature, context.senderName), [context.recipientName, context.senderName, context.company, context.jobTitle, context.jobId]); person.status = 'draft'; person.sentAt = null; person.followUpAt = null; person.error = '';
+  }
+  function restoreReferenceCapitalization(text, values) {
+    let result = text;
+    const references = [...new Set(values.map(value => String(value || '').trim()).filter(Boolean))].sort((a, b) => b.length - a.length);
+    for (const value of references) {
+      const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const matcher = new RegExp(`(^|[^\\p{L}\\p{N}])(${escaped})(?=$|[^\\p{L}\\p{N}])`, 'giu');
+      result = result.replace(matcher, (_match, prefix) => `${prefix}${value}`);
+    }
+    return result;
   }
   function ensureGreeting(body, recipientName) {
     const greeting = recipientName ? `Hi ${recipientName},` : 'Hello,';
