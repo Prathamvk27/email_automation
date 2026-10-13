@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=starred-1" />
+    <link rel="stylesheet" href="styles.css?v=contacts-retain-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -22,6 +22,7 @@
           <a class="nav-link" href="#profile" title="My profile" aria-label="My profile"><span class="nav-icon">◉</span><span class="nav-label">My profile</span></a>
           <a class="nav-link" href="#styles" title="Writing styles" aria-label="Writing styles"><span class="nav-icon">✎</span><span class="nav-label">Writing styles</span></a>
           <a class="nav-link" href="#outreach" title="Outreach" aria-label="Outreach"><span class="nav-icon">↗</span><span class="nav-label">Outreach</span><span class="nav-count" id="navOutreachCount">00</span></a>
+          <a class="nav-link" href="#contacts" title="Contacts" aria-label="Contacts"><span class="nav-icon">♙</span><span class="nav-label">Contacts</span><span class="nav-count" id="navContactsCount">00</span></a>
         </nav>
         <div class="sidebar-bottom">
           <div class="privacy-card"><span class="privacy-icon">◉</span><div><strong>Your notes stay yours.</strong><p>Drafts and profiles live in this browser.</p></div></div>
@@ -76,9 +77,9 @@
         <footer class="footer"><a class="brand mini" href="#top" aria-label="god send home"><span class="brand-mark">gs</span></a><span>Small notes. Good conversations.</span><span>Made with care <i>✳</i></span></footer>
         </div>
         <section class="outreach-page" id="outreachPage" aria-labelledby="outreachPageTitle" hidden>
-          <div class="profile-page-head outreach-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEP THE CONVERSATION OPEN</div><h1 id="outreachPageTitle">Your outreach</h1><p>Every person and message you’ve prepared lives here. Track drafts, sent notes, replies, and follow-ups in one place.</p></div><div class="outreach-page-actions"><a class="outline-button" href="#compose">＋ Add contacts</a><button class="outline-button" id="exportCsv">Export list <span>↓</span></button></div></div>
+          <div class="profile-page-head outreach-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEP THE CONVERSATION OPEN</div><h1 id="outreachPageTitle">Your outreach</h1><p>Messages you have staged live here. Track drafts, sent notes, replies, and follow-ups in one place. Your Contacts directory is kept separately.</p></div><div class="outreach-page-actions"><a class="outline-button" href="#compose">＋ Add contacts</a><button class="outline-button" id="exportCsv">Export list <span>↓</span></button></div></div>
           <div class="outreach-summary" aria-label="Outreach summary">
-            <article><span>ALL CONTACTS</span><strong id="outreachTotalCount">00</strong></article>
+            <article><span>STAGED EMAILS</span><strong id="outreachTotalCount">00</strong></article>
             <article><span>DRAFTS TO REVIEW</span><strong id="outreachDraftCount">00</strong></article>
             <article><span>SENT</span><strong id="outreachSentCount">00</strong></article>
             <article><span>REPLIES</span><strong id="outreachReplyCount">00</strong></article>
@@ -92,11 +93,15 @@
             </div></div>
           <div class="outreach-bulk-toolbar" aria-label="Bulk outreach actions"><label class="select-visible-drafts"><input id="selectVisibleOutreach" type="checkbox" /><span>Select visible emails</span></label><span id="bulkSelectedCount" class="bulk-selected-count">0 selected</span><button class="text-button clear-selection-button" id="clearOutreachSelection" type="button" hidden>Clear selection</button><span class="bulk-action-spacer"></span><button class="outline-button" id="bulkReworkButton" type="button" disabled>Rework</button><button class="outline-button" id="bulkMarkSentButton" type="button" disabled>Mark sent</button><button class="outline-button" id="bulkOpenGmailButton" type="button" disabled>Open in Gmail</button><button class="outline-button" id="bulkCreateGmailButton" type="button" disabled>Create Gmail drafts + resume</button><p class="bulk-action-status" id="bulkActionStatus" role="status" aria-live="polite" hidden></p><button class="text-button bulk-stop-button" id="stopBulkGmail" type="button" hidden>Stop after current</button></div>
           <section class="outreach-section" id="outreach" aria-labelledby="outreachListTitle">
-            <div class="outreach-heading"><div><h2 id="outreachListTitle">Contacts and messages <span id="outreachTotal">(0)</span></h2><p>Open each message to copy, rework, or continue the conversation.</p></div><button class="text-button clear-outreach-button" id="clearOutreach" type="button">Clear outreach</button></div>
+            <div class="outreach-heading"><div><h2 id="outreachListTitle">Staged emails <span id="outreachTotal">(0)</span></h2><p>Removing an email here keeps the contact in your Contacts directory.</p></div><button class="text-button clear-outreach-button" id="clearOutreach" type="button">Clear staged emails</button></div>
             <div id="outreachList" class="outreach-list"></div>
             <div id="emptyOutreach" class="empty-state"><span>↗</span><b>Your outreach list is empty.</b><p>Write a note in Compose and it will be saved here automatically.</p><a class="outline-button" href="#compose">Go to Compose</a></div>
             <div id="emptyOutreachFilter" class="empty-state" hidden><span>◷</span><b>No contacts in this view.</b><p>Choose another status filter to see the rest of your outreach.</p></div>
           </section>
+        </section>
+        <section class="profile-page contacts-page" id="contactsPage" aria-labelledby="contactsPageTitle" hidden>
+          <div class="profile-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR SAVED ADDRESS BOOK</div><h1 id="contactsPageTitle">Contacts</h1><p>Contact details live here independently from staged emails. Removing an email from Outreach will not delete its contact.</p></div><div class="contacts-page-actions"><a class="outline-button" href="#compose">＋ Add new contact</a><button class="outline-button" id="exportContacts" type="button">Export contacts ↓</button></div></div>
+          <section class="panel contacts-panel" aria-labelledby="contactsListTitle"><div class="section-heading"><div><span class="step">SAVED</span><div><h2 id="contactsListTitle">Your contacts <span id="contactsTotal">0</span></h2><p>Keep names, email addresses, companies, and role details for future outreach.</p></div></div></div><label class="contacts-search" for="contactsSearch"><span>Find a contact</span><input id="contactsSearch" type="search" autocomplete="off" placeholder="Name, email, company, or role" /></label><div id="contactsList" class="contacts-list"></div><div id="contactsEmpty" class="empty-state" hidden><span>♙</span><b>No saved contacts yet.</b><p>Contacts are saved here as you add people or write emails.</p><a class="outline-button" href="#compose">Go to Compose</a></div><div id="contactsNoMatch" class="empty-state" hidden><span>⌕</span><b>No matching contacts.</b><p>Try another name, email, company, or role.</p></div></section>
         </section>
         <section class="profile-page" id="profilePage" aria-labelledby="profilePageTitle" hidden>
           <div class="profile-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR REUSABLE CONTEXT</div><h1 id="profilePageTitle">My writing profile</h1><p>Set your background and role specific stories here once. god send reuses them when you write a note for a matching role.</p></div><a class="outline-button" href="#compose">Back to compose <span>↗</span></a></div>
@@ -156,6 +161,6 @@
     <dialog id="bulkReworkDialog" class="settings-dialog bulk-rework-dialog"><form method="dialog" id="bulkReworkForm"><div class="dialog-head"><div><span class="step">BULK DRAFT REVIEW</span><h2>Rework selected drafts</h2><p id="bulkReworkDescription">A shared instruction will be applied to each selected draft. Every result is reviewed before it replaces your saved version.</p></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>What should change across these emails?<textarea id="bulkReworkDirection" rows="3" maxlength="500" placeholder="e.g. Make the ask more direct and keep each project detail specific to the person."></textarea></label><p class="bulk-rework-note" id="bulkReworkPaceNote"></p><div class="bulk-progress" id="bulkReworkProgressBox" hidden><progress id="bulkReworkProgress" max="1" value="0"></progress><p id="bulkReworkStatus" role="status" aria-live="polite"></p></div><div class="bulk-rework-results" id="bulkReworkResults" hidden></div><p class="dialog-foot" id="bulkReworkSummary" role="status" aria-live="polite"></p><div class="dialog-actions"><button class="text-button" id="cancelBulkRework" type="button">Cancel</button><button class="text-button" id="stopBulkRework" type="button" hidden>Stop after this email</button><button class="outline-button" id="runBulkRework" type="button">Rework drafts</button><button class="outline-button" id="applyBulkRework" type="button" hidden>Apply selected revisions</button></div></form></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script type="module" src="script.js?v=starred-1"></script>
+    <script type="module" src="script.js?v=contacts-retain-1"></script>
   </body>
 </html>
