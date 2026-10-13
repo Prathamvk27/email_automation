@@ -8,6 +8,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   const RESUME_DB_NAME = 'goodsend.local.assets.v1';
   const MAX_PEOPLE = 25;
   const MAX_STORIES_PER_ROLE = 10;
+  const SAVE_DEBOUNCE_MS = 300;
   const FOLLOW_UP_DAYS = 2;
   const roles = ['Software engineer', 'Frontend engineer', 'Backend engineer', 'Data / ML', 'Product', 'Design', 'Research', 'Marketing', 'Operations', 'Founder / executive', 'Other'];
   const builtInStyles = [
@@ -46,6 +47,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   let bulkGmailRunning = false;
   let bulkGmailStopRequested = false;
   let toastTimer;
+  let pendingPersistTimer = null;
 
   function loadState() {
     try {
@@ -117,10 +119,21 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       return { clientId: typeof saved.clientId === 'string' ? saved.clientId : '' };
     } catch { return { clientId: '' }; }
   }
-  function persist() {
+  function persist({ render = true } = {}) {
+    if (pendingPersistTimer) clearTimeout(pendingPersistTimer);
+    pendingPersistTimer = null;
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { showToast('Browser storage is full. Export your drafts to keep a copy.'); }
-    if ($('#contactsList')) renderContacts();
-    updateSummary();
+    updateSummary({ render });
+  }
+  function schedulePersist() {
+    if (pendingPersistTimer) clearTimeout(pendingPersistTimer);
+    pendingPersistTimer = setTimeout(() => {
+      pendingPersistTimer = null;
+      persist({ render: false });
+    }, SAVE_DEBOUNCE_MS);
+  }
+  function flushScheduledPersist() {
+    if (pendingPersistTimer) persist({ render: false });
   }
   function contactDetails(person) {
     return { id: person.id, name: person.name || '', email: person.email || '', role: person.role || '', company: person.company || '', jobTitle: person.jobTitle || '', jobId: person.jobId || '', jobDescription: person.jobDescription || '', context: person.context || '', starred: Boolean(person.starred) };
@@ -233,7 +246,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     }
     persist(); renderWritingStyles(); $('#styleDialog').close(); showToast('Writing method saved.');
   }
-  function updateSummary() {
+  function updateSummary({ render = true } = {}) {
     const count = state.people.length;
     const drafts = state.outreach.filter(person => person.subject && person.body && person.status === 'draft').length;
     const due = state.outreach.filter(person => person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date()).length;
@@ -246,8 +259,10 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     $('#peopleCounter').textContent = `${String(count).padStart(2, '0')} / 25`;
     $('#addRemaining').textContent = count === MAX_PEOPLE ? 'Limit reached' : `${MAX_PEOPLE - count} spots left`;
     $('#addPerson').disabled = count >= MAX_PEOPLE;
-    renderOutreach();
-    renderContacts();
+    if (render) {
+      renderOutreach();
+      renderContacts();
+    }
   }
   function setApiStatus() {
     const ready = Boolean(api.base && api.model && api.key);
@@ -697,6 +712,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       if (selected) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
     }
     window.scrollTo({ top: 0, behavior: outreachPage ? 'smooth' : 'auto' });
+    if (contactsPage) renderContacts();
   }
   function buildContext(person) {
     const roleProfile = person.role ? (state.roleProfiles[person.role] || []).filter(story => [story.title, story.built, story.why, story.how, story.result].some(value => value.trim())) : [];
@@ -1185,8 +1201,8 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   renderGmailStatus();
   renderWritingStyles();
   updatePage();
-  $('#peopleList').addEventListener('input', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (!card || !field) return; const person = personById(card.dataset.person); if (!person) return; person[field] = event.target.value; syncContact(person); persist(); if (field === 'name' || field === 'email') renderOutreach(); });
-  $('#peopleList').addEventListener('change', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (card && field) { const person = personById(card.dataset.person); if (person) { person[field] = event.target.value; syncContact(person); persist(); } } });
+  $('#peopleList').addEventListener('input', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (!card || !field) return; const person = personById(card.dataset.person); if (!person) return; person[field] = event.target.value; syncContact(person); schedulePersist(); });
+  $('#peopleList').addEventListener('change', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (card && field) { const person = personById(card.dataset.person); if (person) { person[field] = event.target.value; syncContact(person); persist({ render: false }); } } });
   $('#peopleList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.closest('[data-person]')?.dataset.person); });
   $('#outreachList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.dataset.person); });
   $('#contactsSearch').addEventListener('input', renderContacts);
@@ -1303,6 +1319,8 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   $('#mainNavigation').addEventListener('click', () => { if (mobileSidebar.matches) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   mobileSidebar.addEventListener('change', () => { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); });
   window.addEventListener('hashchange', updatePage);
+  window.addEventListener('pagehide', flushScheduledPersist);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushScheduledPersist(); });
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv); $('#exportContacts').addEventListener('click', exportContactsCsv);
   $('#clearOutreach').addEventListener('click', clearOutreach);

@@ -50,6 +50,7 @@ The model provider must allow browser requests from the site (CORS). The API key
 ## Data and privacy
 
 - The contact directory, Compose contacts, staged emails, base profile, role-specific project profiles, custom writing methods, selected style, and prompts stay in this browser's local storage until cleared.
+- Compose edits are saved in a short batch while you type, and the app avoids redrawing the Outreach and Contacts lists for every keystroke. Data still saves immediately for deliberate actions and when the page is closed or refreshed.
 - The optional resume file is stored in this browser's IndexedDB and is not sent to the model. It is attached only when you explicitly create a Gmail draft.
 - API keys are held in page memory by default; the explicit remember option stores the key in this browser's local storage until you uncheck the option and save or clear browser data.
 - When you generate a draft, the sender profile, role stories you entered, recipient name/role/company/context, and custom direction are sent to the API endpoint you configured. The recipient email address and uploaded resume file stay in this browser and are not sent to the model. Review the provider's data handling terms before adding resume details to your profile.
