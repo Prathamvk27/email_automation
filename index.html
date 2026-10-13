@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f7f7f2" />
     <meta name="description" content="A thoughtful workspace for writing and tracking personal outreach." />
-    <title>godsend — thoughtful outreach, one note at a time</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=godsend-brand-1" />
+    <title>god send — thoughtful outreach, one note at a time</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=god-send-brand-1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=godsend-brand-1" />
+    <link rel="stylesheet" href="styles.css?v=god-send-brand-1" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <a class="brand" href="#top" aria-label="godsend home"><span class="brand-mark">gh</span></a>
+        <a class="brand" href="#top" aria-label="god send home"><span class="brand-mark">gs</span></a>
         <div class="workspace-label">YOUR WORKSPACE</div>
         <nav class="nav-list" id="mainNavigation" aria-label="Main navigation">
           <a class="nav-link active" href="#compose" title="Compose" aria-label="Compose"><span class="nav-icon">✳</span><span class="nav-label">Compose</span><span class="nav-count" id="navCount">01</span></a>
@@ -70,10 +70,10 @@
           </aside>
         </section>
         <section class="outreach-section" id="outreach"><div class="outreach-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEP THE CONVERSATION OPEN</div><h2>Your outreach <span id="outreachTotal">(0)</span></h2><p>Mark a note as sent to start its follow-up timer. Due dates appear here when you return.</p></div><div class="outreach-actions"><button class="outline-button" id="exportCsv">Export list <span>↓</span></button><button class="text-button" id="clearOutreach">Clear workspace</button></div></div><div id="outreachList" class="outreach-list"></div><div id="emptyOutreach" class="empty-state"><span>↗</span><b>Your conversations start here.</b><p>Generate a note, then mark it sent to keep track of replies and follow-ups.</p></div></section>
-        <footer class="footer"><a class="brand mini" href="#top" aria-label="godsend home"><span class="brand-mark">gh</span></a><span>Small notes. Good conversations.</span><span>Made with care <i>✳</i></span></footer>
+        <footer class="footer"><a class="brand mini" href="#top" aria-label="god send home"><span class="brand-mark">gs</span></a><span>Small notes. Good conversations.</span><span>Made with care <i>✳</i></span></footer>
         </div>
         <section class="profile-page" id="profilePage" aria-labelledby="profilePageTitle" hidden>
-          <div class="profile-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR REUSABLE CONTEXT</div><h1 id="profilePageTitle">My writing profile</h1><p>Set your background and role specific stories here once. godsend reuses them when you write a note for a matching role.</p></div><a class="outline-button" href="#compose">Back to compose <span>↗</span></a></div>
+          <div class="profile-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR REUSABLE CONTEXT</div><h1 id="profilePageTitle">My writing profile</h1><p>Set your background and role specific stories here once. god send reuses them when you write a note for a matching role.</p></div><a class="outline-button" href="#compose">Back to compose <span>↗</span></a></div>
           <div class="profile-page-content">
             <section class="panel profile-panel">
               <div class="section-heading"><div><span class="step">01</span><div><h2>Your base profile</h2><p>Add your name, focus, and experience that applies across roles.</p></div></div><span class="optional-tag">SAVED HERE</span></div>
@@ -81,7 +81,7 @@
               <label class="field-label">General background or transferable experience<textarea id="senderContext" rows="4" placeholder="Add a short summary of your background, strengths, and interests that apply across roles. Put role specific project stories below."></textarea></label>
             </section>
             <section class="panel role-profile-panel">
-              <div class="section-heading"><div><span class="step">02</span><div><h2>Role specific project stories</h2><p>Save several stories per role. godsend uses the most relevant one for each contact.</p></div></div><button class="outline-button" id="addRoleStory" type="button">＋ Add story</button></div>
+              <div class="section-heading"><div><span class="step">02</span><div><h2>Role specific project stories</h2><p>Save several stories per role. god send uses the most relevant one for each contact.</p></div></div><button class="outline-button" id="addRoleStory" type="button">＋ Add story</button></div>
               <label class="role-picker-label" for="roleProfileRole">Choose a role profile</label>
               <select id="roleProfileRole" class="role-profile-select" aria-describedby="roleProfileHint"></select>
               <label class="role-picker-label story-picker-label" for="roleProfileStory">Choose a story <span class="optional-tag" id="roleProfileStatus">SAVED HERE</span></label>
@@ -95,19 +95,19 @@
                 <label>What was the result?<textarea id="storyResult" rows="2" maxlength="800" placeholder="A measured result, outcome, or what you learned. Leave blank if unknown."></textarea></label>
               </div>
               <div class="story-management"><span id="storyCount">1 / 10 stories for this role</span><button class="text-button" id="deleteRoleStory" type="button">Delete this story</button></div>
-              <p class="profile-footer-note">Your profiles are stored in this browser. godsend shares role stories with your model provider only when you generate a matching email.</p>
+              <p class="profile-footer-note">Your profiles are stored in this browser. god send shares role stories with your model provider only when you generate a matching email.</p>
             </section>
             <section class="panel resume-panel">
               <div class="section-heading"><div><span class="step">03</span><div><h2>Resume attachment</h2><p>Save one resume on this device, then add it to an email draft.</p></div></div><span class="optional-tag">OPTIONAL</span></div>
               <div class="resume-controls"><label class="resume-upload">Choose resume file<input id="resumeFile" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /></label><button class="text-button" id="removeResume" type="button" hidden>Remove saved resume</button></div>
               <p id="resumeStatus" class="profile-hint" role="status">No resume saved.</p>
               <div class="gmail-connect-box">
-                <div><h3>Attach it directly in Gmail</h3><p>godsend will save a draft with your resume attached. Review and send it yourself.</p></div>
+                <div><h3>Attach it directly in Gmail</h3><p>god send will save a draft with your resume attached. Review and send it yourself.</p></div>
                 <label class="field-label" for="gmailClientId">Google OAuth web client ID<input id="gmailClientId" type="text" autocomplete="off" placeholder="1234567890-abc.apps.googleusercontent.com" /></label>
                 <p class="gmail-setup-note">In Google Cloud, enable Gmail API, create a Web application OAuth client, and add this site origin as an authorized JavaScript origin: <code id="gmailOrigin"></code>. For local testing, add <code>http://localhost:4173</code>.</p>
                 <div class="gmail-controls"><button class="outline-button" id="saveGmailSettings" type="button">Save Gmail settings</button><button class="outline-button" id="connectGmail" type="button">Connect Gmail</button><button class="text-button" id="disconnectGmail" type="button" hidden>Disconnect</button></div>
                 <p id="gmailStatus" class="profile-hint" role="status">Gmail is not connected.</p>
-                <p class="profile-footer-note">Google’s Gmail compose permission can manage drafts and send mail. godsend only creates drafts; it never calls Gmail’s send action. The access token stays in memory and clears when this page reloads. Your resume is sent to Gmail only when you create a draft.</p>
+                <p class="profile-footer-note">Google’s Gmail compose permission can manage drafts and send mail. god send only creates drafts; it never calls Gmail’s send action. The access token stays in memory and clears when this page reloads. Your resume is sent to Gmail only when you create a draft.</p>
               </div>
               <p class="profile-footer-note">The resume stays in this browser and is never sent to the writing model. Use “Download email + resume” in Outreach if you prefer the attachment-ready .eml file.</p>
             </section>
