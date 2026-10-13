@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=god-send-brand-1" />
+    <link rel="stylesheet" href="styles.css?v=outreach-page-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -73,9 +73,29 @@
             <p class="generation-note">You review every note before sending.<br />Nothing goes out automatically.</p>
           </aside>
         </section>
-        <section class="outreach-section" id="outreach"><div class="outreach-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEP THE CONVERSATION OPEN</div><h2>Your outreach <span id="outreachTotal">(0)</span></h2><p>Mark a note as sent to start its follow-up timer. Due dates appear here when you return.</p></div><div class="outreach-actions"><button class="outline-button" id="exportCsv">Export list <span>↓</span></button><button class="text-button" id="clearOutreach">Clear workspace</button></div></div><div id="outreachList" class="outreach-list"></div><div id="emptyOutreach" class="empty-state"><span>↗</span><b>Your conversations start here.</b><p>Generate a note, then mark it sent to keep track of replies and follow-ups.</p></div></section>
         <footer class="footer"><a class="brand mini" href="#top" aria-label="god send home"><span class="brand-mark">gs</span></a><span>Small notes. Good conversations.</span><span>Made with care <i>✳</i></span></footer>
         </div>
+        <section class="outreach-page" id="outreachPage" aria-labelledby="outreachPageTitle" hidden>
+          <div class="profile-page-head outreach-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEP THE CONVERSATION OPEN</div><h1 id="outreachPageTitle">Your outreach</h1><p>Every person and message you’ve prepared lives here. Track drafts, sent notes, replies, and follow-ups in one place.</p></div><div class="outreach-page-actions"><a class="outline-button" href="#compose">＋ Add contacts</a><button class="outline-button" id="exportCsv">Export list <span>↓</span></button></div></div>
+          <div class="outreach-summary" aria-label="Outreach summary">
+            <article><span>ALL CONTACTS</span><strong id="outreachTotalCount">00</strong></article>
+            <article><span>DRAFTS TO REVIEW</span><strong id="outreachDraftCount">00</strong></article>
+            <article><span>SENT</span><strong id="outreachSentCount">00</strong></article>
+            <article><span>REPLIES</span><strong id="outreachReplyCount">00</strong></article>
+          </div>
+          <div class="outreach-list-toolbar"><label class="outreach-search" for="outreachSearch"><span>Find a person</span><input id="outreachSearch" type="search" autocomplete="off" placeholder="Name, email, company, or job" /></label><div class="outreach-filters" id="outreachFilters" role="group" aria-label="Filter outreach contacts">
+              <button class="outreach-filter active" type="button" data-outreach-filter="all" aria-pressed="true">All <span id="filterAllCount">00</span></button>
+              <button class="outreach-filter" type="button" data-outreach-filter="draft" aria-pressed="false">Drafts <span id="filterDraftCount">00</span></button>
+              <button class="outreach-filter" type="button" data-outreach-filter="sent" aria-pressed="false">Sent <span id="filterSentCount">00</span></button>
+              <button class="outreach-filter" type="button" data-outreach-filter="replied" aria-pressed="false">Replies <span id="filterReplyCount">00</span></button>
+            </div></div>
+          <section class="outreach-section" id="outreach" aria-labelledby="outreachListTitle">
+            <div class="outreach-heading"><div><h2 id="outreachListTitle">Contacts and messages <span id="outreachTotal">(0)</span></h2><p>Open each message to copy, rework, or continue the conversation.</p></div><button class="text-button clear-outreach-button" id="clearOutreach" type="button">Clear outreach</button></div>
+            <div id="outreachList" class="outreach-list"></div>
+            <div id="emptyOutreach" class="empty-state"><span>↗</span><b>Your outreach list is empty.</b><p>Write a note in Compose and it will be saved here automatically.</p><a class="outline-button" href="#compose">Go to Compose</a></div>
+            <div id="emptyOutreachFilter" class="empty-state" hidden><span>◷</span><b>No contacts in this view.</b><p>Choose another status filter to see the rest of your outreach.</p></div>
+          </section>
+        </section>
         <section class="profile-page" id="profilePage" aria-labelledby="profilePageTitle" hidden>
           <div class="profile-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR REUSABLE CONTEXT</div><h1 id="profilePageTitle">My writing profile</h1><p>Set your background and role specific stories here once. god send reuses them when you write a note for a matching role.</p></div><a class="outline-button" href="#compose">Back to compose <span>↗</span></a></div>
           <div class="profile-page-content">
@@ -132,6 +152,6 @@
     <dialog id="reworkDialog" class="settings-dialog rework-dialog"><form method="dialog" id="reworkForm"><div class="dialog-head"><div><span class="step">REVISE ONE EMAIL</span><h2>Rework this draft</h2><p>Add a specific change, or leave it blank for a fresh rewrite using the same contact and role details. Your saved version stays untouched until you apply the revision.</p></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>What should change?<textarea id="reworkDirection" rows="3" maxlength="500" placeholder="e.g. Make it shorter and less formal. Keep the project example, but make the ask clearer."></textarea></label><div class="rework-preview" id="reworkPreview" hidden><label>Revised subject<input id="reworkSubject" readonly /></label><label>Revised email<textarea id="reworkBody" rows="10" readonly></textarea></label></div><p id="reworkStatus" class="dialog-foot" role="status" aria-live="polite"></p><div class="dialog-actions"><button class="text-button" id="cancelRework" type="button">Cancel</button><button class="outline-button" id="generateRework" type="button">Generate revision</button><button class="outline-button" id="applyRework" type="button" hidden>Use this version</button></div></form></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script type="module" src="script.js?v=rework-1"></script>
+    <script type="module" src="script.js?v=outreach-page-1"></script>
   </body>
 </html>

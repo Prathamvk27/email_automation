@@ -35,6 +35,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   let reworkPersonId = '';
   let reworkCandidate = null;
   let reworkOriginal = null;
+  let outreachFilter = 'all';
   let toastTimer;
 
   function loadState() {
@@ -226,14 +227,34 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   function renderOutreach() {
     const items = state.outreach;
     $('#outreachTotal').textContent = `(${items.length})`;
+    const draftCount = items.filter(person => person.status === 'draft').length;
+    const sentCount = items.filter(person => person.status === 'sent').length;
+    const replyCount = items.filter(person => person.status === 'replied').length;
+    for (const [id, value] of [['outreachTotalCount', items.length], ['outreachDraftCount', draftCount], ['outreachSentCount', sentCount], ['outreachReplyCount', replyCount], ['filterAllCount', items.length], ['filterDraftCount', draftCount], ['filterSentCount', sentCount], ['filterReplyCount', replyCount]]) $(`#${id}`).textContent = String(value).padStart(2, '0');
+    const query = $('#outreachSearch').value.trim().toLocaleLowerCase();
+    const filteredItems = items.filter(person => {
+      const matchesStatus = outreachFilter === 'all' || person.status === outreachFilter;
+      const searchable = [person.name, person.email, person.company, person.role, person.jobTitle, person.jobId, person.subject].join(' ').toLocaleLowerCase();
+      return matchesStatus && (!query || searchable.includes(query));
+    });
+    for (const button of $('#outreachFilters').querySelectorAll('[data-outreach-filter]')) {
+      const selected = button.dataset.outreachFilter === outreachFilter;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    }
     $('#emptyOutreach').hidden = items.length > 0;
-    $('#outreachList').innerHTML = items.map(person => {
+    $('#emptyOutreachFilter').hidden = items.length === 0 || filteredItems.length > 0;
+    $('#emptyOutreachFilter').querySelector('b').textContent = query ? 'No matching contacts.' : 'No contacts in this view.';
+    $('#emptyOutreachFilter').querySelector('p').textContent = query ? 'Try another name, company, email, or job detail.' : 'Choose another status filter to see the rest of your outreach.';
+    $('#outreachList').innerHTML = filteredItems.map(person => {
       const isDue = person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date();
       const status = person.status === 'replied' ? '<span class="status-pill replied">Reply received</span>' : person.status === 'sent' ? `<span class="status-pill ${isDue ? 'due' : ''}">${person.replyCheck === 'no_reply' ? 'No reply yet · check ' : isDue ? 'Follow-up due' : 'Follow up '}${new Date(person.followUpAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : '<span class="status-pill">Draft ready</span>';
       const reworkAction = person.status === 'draft' && person.subject && person.body ? `<button class="small-action" data-action="rework" data-person="${esc(person.id)}" ${reworkingPeople.has(person.id) ? 'disabled' : ''}>${reworkingPeople.has(person.id) ? 'Reworking…' : 'Rework'}</button>` : '';
       const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>` : `${reworkAction}<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>`;
       const resumeAction = `<button class="small-action primary" data-action="gmail-draft" data-person="${esc(person.id)}" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}`;
-      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.jobTitle || person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}${person.jobId ? ` · Job ID ${esc(person.jobId)}` : ''}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
+      const removeBusy = reworkingPeople.has(person.id) || gmailDrafting.has(person.id);
+      const removeAction = `<button class="small-action remove-outreach" data-action="remove-outreach" data-person="${esc(person.id)}" aria-label="Remove ${esc(person.name || person.email || 'contact')} from Outreach" ${removeBusy ? 'disabled' : ''}>Remove</button>`;
+      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.jobTitle || person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}${person.jobId ? ` · Job ID ${esc(person.jobId)}` : ''}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}${removeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
   }
   function showToast(message) {
@@ -486,17 +507,17 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const profilePage = location.hash === '#profile';
     const stylesPage = location.hash === '#styles';
     const outreachPage = location.hash === '#outreach';
-    $('#composePage').hidden = profilePage || stylesPage;
+    $('#composePage').hidden = profilePage || stylesPage || outreachPage;
     $('#profilePage').hidden = !profilePage;
     $('#stylesPage').hidden = !stylesPage;
+    $('#outreachPage').hidden = !outreachPage;
     $('#breadcrumbPage').textContent = profilePage ? 'My profile' : stylesPage ? 'Writing styles' : outreachPage ? 'Outreach' : 'Compose';
     for (const link of $('#mainNavigation').querySelectorAll('.nav-link')) {
       const selected = profilePage ? link.hash === '#profile' : stylesPage ? link.hash === '#styles' : outreachPage ? link.hash === '#outreach' : link.hash === '#compose';
       link.classList.toggle('active', selected);
       if (selected) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
     }
-    if (outreachPage) requestAnimationFrame(() => $('#outreach').scrollIntoView({ behavior: 'smooth', block: 'start' }));
-    else window.scrollTo({ top: 0, behavior: 'auto' });
+    window.scrollTo({ top: 0, behavior: outreachPage ? 'smooth' : 'auto' });
   }
   function buildContext(person) {
     const roleProfile = person.role ? (state.roleProfiles[person.role] || []).filter(story => [story.title, story.built, story.why, story.how, story.result].some(value => value.trim())) : [];
@@ -700,6 +721,29 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'goodsend-outreach.csv'; link.click(); URL.revokeObjectURL(link.href);
   }
+  function removeOutreach(person) {
+    if (reworkingPeople.has(person.id) || gmailDrafting.has(person.id)) { showToast('Wait for this email action to finish first.'); return; }
+    const name = person.name || person.email || 'this contact';
+    const gmailNote = person.gmailDraftId ? ' A copy already created in Gmail will remain there.' : '';
+    if (!confirm(`Remove ${name} and its saved message, reply status, and follow-up from this device?${gmailNote}`)) return;
+    state.outreach = state.outreach.filter(item => item.id !== person.id);
+    persist();
+    renderPeople();
+    showToast(`${name} removed from Outreach.`);
+  }
+  function clearOutreach() {
+    if (!state.outreach.length) { showToast('Your Outreach list is already empty.'); return; }
+    if (reworkingPeople.size || gmailDrafting.size) { showToast('Wait for the current email action to finish first.'); return; }
+    const gmailCopies = state.outreach.filter(person => person.gmailDraftId).length;
+    const gmailNote = gmailCopies ? ` ${gmailCopies} Gmail draft${gmailCopies === 1 ? '' : 's'} already created will remain in Gmail.` : '';
+    if (!confirm(`Remove all ${state.outreach.length} contacts and saved messages from this device? Your Compose contacts, profile, resume, and settings will stay.${gmailNote}`)) return;
+    state.outreach = [];
+    outreachFilter = 'all';
+    $('#outreachSearch').value = '';
+    persist();
+    renderPeople();
+    showToast('Outreach list cleared. Your profile and Compose contacts are still saved.');
+  }
   function handleAction(action, id) {
     const person = personById(id);
     if (!person) return;
@@ -711,6 +755,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     if (action === 'compose') compose(person);
     if (action === 'rework') openRework(person);
     if (action === 'gmail-draft') createGmailDraftWithResume(person);
+    if (action === 'remove-outreach') removeOutreach(person);
     if (action === 'mark-sent') markSent(person);
     if (action === 'replied') { person.status = 'replied'; person.repliedAt = new Date().toISOString(); persist(); renderPeople(); showToast('Reply recorded. Nice.'); }
     if (action === 'no-reply') { person.replyCheck = 'no_reply'; person.followUpAt = new Date(Date.now() + FOLLOW_UP_DAYS * 86400000).toISOString(); persist(); renderPeople(); showToast('No reply yet. We’ll remind you to check again in two days.'); }
@@ -803,6 +848,8 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   $('#peopleList').addEventListener('change', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (card && field) { const person = personById(card.dataset.person); if (person) { person[field] = event.target.value; persist(); } } });
   $('#peopleList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.closest('[data-person]')?.dataset.person); });
   $('#outreachList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.dataset.person); });
+  $('#outreachFilters').addEventListener('click', event => { const button = event.target.closest('[data-outreach-filter]'); if (!button) return; outreachFilter = button.dataset.outreachFilter; renderOutreach(); });
+  $('#outreachSearch').addEventListener('input', renderOutreach);
   $('#addPerson').addEventListener('click', () => { if (state.people.length >= MAX_PEOPLE) return; state.people.push(newPerson()); persist(); renderPeople(); $('#peopleList article:last-child [data-field="name"]').focus(); });
   for (const [id, key] of [['senderName','senderName'], ['senderFocus','senderFocus'], ['senderContext','senderContext'], ['senderSignature','senderSignature']]) $(`#${id}`).addEventListener('input', event => { state[key] = event.target.value.slice(0, key === 'senderSignature' ? 500 : 3000); if (event.target.value.length > state[key].length) event.target.value = state[key]; persist(); });
   $('#customPrompt').addEventListener('input', event => { state.customPrompt = event.target.value.slice(0, 500); if (event.target.value.length > 500) event.target.value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; persist(); });
@@ -894,5 +941,5 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   window.addEventListener('hashchange', updatePage);
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv);
-  $('#clearOutreach').addEventListener('click', () => { if (queueLoopActive || generatingPeople.size) { showToast('Wait for the current draft to finish, then clear the workspace.'); return; } if (!confirm('Clear every person, draft, profile, follow-up, and saved resume from this browser? This cannot be undone.')) return; wakeQueue(); localStorage.removeItem(STORE_KEY); deleteResumeFile().then(renderResumeStatus).catch(() => {}); state = { senderName: '', senderFocus: '', senderContext: '', senderSignature: '', customPrompt: '', voiceGuide: '', queueIntervalSeconds: 30, queue: null, roleProfiles: normalizeRoleProfiles({}), roleProfileEditorRole: roles[0], roleProfileEditorStoryId: '', writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; state.roleProfileEditorStoryId = state.roleProfiles[roles[0]][0].id; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#senderSignature').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; $('#voiceGuide').value = ''; $('#voiceGuideChars').textContent = '0 / 1000'; renderRoleProfile(); renderResumeStatus(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
+  $('#clearOutreach').addEventListener('click', clearOutreach);
 })();
