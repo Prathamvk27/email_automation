@@ -227,7 +227,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       const isDue = person.status === 'sent' && person.followUpAt && new Date(person.followUpAt) <= new Date();
       const status = person.status === 'replied' ? '<span class="status-pill replied">Reply received</span>' : person.status === 'sent' ? `<span class="status-pill ${isDue ? 'due' : ''}">${person.replyCheck === 'no_reply' ? 'No reply yet · check ' : isDue ? 'Follow-up due' : 'Follow up '}${new Date(person.followUpAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : '<span class="status-pill">Draft ready</span>';
       const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>` : `<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>`;
-      const resumeAction = `<button class="small-action" data-action="email-with-resume" data-person="${esc(person.id)}">Download email + resume</button><button class="small-action primary" data-action="gmail-draft" data-person="${esc(person.id)}" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}`;
+      const resumeAction = `<button class="small-action primary" data-action="gmail-draft" data-person="${esc(person.id)}" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}`;
       return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.jobTitle || person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}${person.jobId ? ` · Job ID ${esc(person.jobId)}` : ''}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
   }
@@ -305,50 +305,6 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const chunkSize = 0x8000;
     for (let index = 0; index < bytes.length; index += chunkSize) binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
     return btoa(binary);
-  }
-  async function downloadEmailWithResume(person) {
-    if (!person.email || !person.subject || !person.body) { showToast('This saved email is missing its address or message.'); return; }
-    let resume;
-    try { resume = await getResumeFile(); }
-    catch { showToast('Could not read the saved resume from this browser.'); return; }
-    if (!resume) { showToast('Add your resume first in My profile.'); return; }
-    const boundary = `goodsend-${crypto.randomUUID()}`;
-    const subject = bytesToBase64(new TextEncoder().encode(person.subject));
-    const body = bytesToBase64(new TextEncoder().encode(person.body.replace(/\r?\n/g, '\r\n')));
-    const attachment = bytesToBase64(new Uint8Array(await resume.arrayBuffer()));
-    const safeFilename = resume.name.replace(/[\r\n"]/g, '_');
-    const fallbackFilename = safeFilename.replace(/[^\x20-\x7E]/g, '_').replace(/[\\;]/g, '_');
-    const encodedFilename = encodeURIComponent(safeFilename).replace(/['()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
-    const mimeType = /^[\w!#$&^_.+-]+\/[\w!#$&^_.+-]+$/.test(resume.type) ? resume.type : 'application/octet-stream';
-    const wrap = value => value.match(/.{1,76}/g)?.join('\r\n') || '';
-    const eml = [
-      `To: ${person.email}`,
-      `Subject: =?UTF-8?B?${subject}?=`,
-      'X-Unsent: 1',
-      'MIME-Version: 1.0',
-      `Content-Type: multipart/mixed; boundary="${boundary}"`,
-      '',
-      `--${boundary}`,
-      'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: base64',
-      '',
-      wrap(body),
-      `--${boundary}`,
-      `Content-Type: ${mimeType}; name="${fallbackFilename}"; name*=UTF-8''${encodedFilename}`,
-      'Content-Transfer-Encoding: base64',
-      `Content-Disposition: attachment; filename="${fallbackFilename}"; filename*=UTF-8''${encodedFilename}`,
-      '',
-      wrap(attachment),
-      `--${boundary}--`,
-      ''
-    ].join('\r\n');
-    const link = document.createElement('a');
-    const safeName = (person.name || 'outreach').normalize('NFKD').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'outreach';
-    link.href = URL.createObjectURL(new Blob([eml], { type: 'message/rfc822' }));
-    link.download = `${safeName}-email.eml`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
-    showToast('Email file with resume downloaded. Open it in your mail app to review and send.');
   }
   function renderGmailStatus(message = '') {
     const connected = Boolean(gmailSession.accessToken && Date.now() < gmailSession.expiresAt);
@@ -745,7 +701,6 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     if (action === 'copy-body') copyText(person.body, 'Message');
     if (action === 'copy-all') copyText(`Subject: ${person.subject}\n\n${person.body}`, 'Subject and message');
     if (action === 'compose') compose(person);
-    if (action === 'email-with-resume') downloadEmailWithResume(person);
     if (action === 'gmail-draft') createGmailDraftWithResume(person);
     if (action === 'mark-sent') markSent(person);
     if (action === 'replied') { person.status = 'replied'; person.repliedAt = new Date().toISOString(); persist(); renderPeople(); showToast('Reply recorded. Nice.'); }

@@ -48,7 +48,7 @@ The model provider must allow browser requests from the site (CORS). The API key
 ## Data and privacy
 
 - Contacts, base profile, role-specific project profiles, custom writing methods, selected style, prompts, and drafts stay in this browser's local storage until cleared.
-- The optional resume file is stored in this browser's IndexedDB, is not sent to the model, and can be included in a downloaded .eml draft. A webpage cannot silently attach a local file to a mailto link; opening or importing .eml files depends on the mail app.
+- The optional resume file is stored in this browser's IndexedDB and is not sent to the model. It is attached only when you explicitly create a Gmail draft.
 - API keys are held in page memory by default; the explicit remember option stores the key in this browser's local storage until you uncheck the option and save or clear browser data.
 - When you generate a draft, the sender profile, role stories you entered, recipient name/role/company/context, and custom direction are sent to the API endpoint you configured. The recipient email address and uploaded resume file stay in this browser and are not sent to the model. Review the provider's data handling terms before adding resume details to your profile.
 - Do not put secrets in the source code or commit an API key.
@@ -60,6 +60,6 @@ The model provider must allow browser requests from the site (CORS). The API key
 - Role, company, recipient context, sender profile, and optional writing direction.
 - A separate Writing styles library with Natural and Abigayle framing methods, plus up to 20 editable custom methods. The selected style is applied to single-person and batch drafts.
 - A separate **My profile** page for up to 10 reusable project stories per target role; the writer selects at most one relevant story per email.
-- An optional saved resume, Gmail OAuth connection, and a Gmail API action to create a reviewable draft with the resume attached; the existing attachment-ready .eml download remains available.
+- An optional saved resume, Gmail OAuth connection, and a Gmail API action to create a reviewable draft with the resume attached.
 - Editable subject and body with copy buttons and a prefilled Gmail compose link (recipient, subject, and body).
 - Local outreach tracker with a two-day follow-up date, reply status, and CSV export.
