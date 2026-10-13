@@ -15,7 +15,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     { id: 'abigayle', name: 'Abigayle framing', description: 'Tell a project story through what, why, how, and result.', instructions: 'For the single role profile story you chose, shape its project sentence in this order: what I built or did → why I did it → how I did it → result. Make the sequence sound natural and specific. Use only the supplied fields. If the result is blank, do not invent one; omit it or describe only a supplied qualitative outcome. Do not force this structure onto unrelated sentences.' }
   ];
   const $ = (selector, root = document) => root.querySelector(selector);
-  const newPerson = () => ({ id: crypto.randomUUID(), name: '', email: '', role: '', company: '', context: '', subject: '', body: '', status: 'draft', sentAt: null, followUpAt: null, repliedAt: null });
+  const newPerson = () => ({ id: crypto.randomUUID(), name: '', email: '', role: '', company: '', jobTitle: '', jobId: '', jobDescription: '', context: '', subject: '', body: '', status: 'draft', sentAt: null, followUpAt: null, repliedAt: null });
   let state = loadState();
   let api = { ...loadApiPreferences(), key: '' };
   let gmailSettings = loadGmailSettings();
@@ -48,10 +48,10 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       const archivedPeople = people.filter(person => person.subject || person.body || person.status !== 'draft');
       const composePeople = people.filter(person => !person.subject && !person.body && person.status === 'draft');
       const queue = saved.queue && Array.isArray(saved.queue.ids) ? { ids: saved.queue.ids.filter(id => typeof id === 'string'), index: Math.max(0, Number(saved.queue.index) || 0), status: saved.queue.status === 'running' ? 'paused' : ['paused', 'complete', 'stopped'].includes(saved.queue.status) ? saved.queue.status : 'paused', interval: [30, 45, 60, 90].includes(Number(saved.queue.interval)) ? Number(saved.queue.interval) : 30, pauseReason: typeof saved.queue.pauseReason === 'string' ? saved.queue.pauseReason : '', nextRunAt: 0 } : null;
-      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', customPrompt: saved.customPrompt || '', voiceGuide: typeof saved.voiceGuide === 'string' ? saved.voiceGuide.slice(0, 1000) : '', queueIntervalSeconds: [30, 45, 60, 90].includes(Number(saved.queueIntervalSeconds)) ? Number(saved.queueIntervalSeconds) : 30, queue, roleProfiles, roleProfileEditorRole, roleProfileEditorStoryId, writingStyles, selectedStyleId, people: composePeople.length ? composePeople : [newPerson()], outreach: [...archivedPeople, ...priorOutreach] };
+      return { senderName: saved.senderName || '', senderFocus: saved.senderFocus || '', senderContext: saved.senderContext || '', senderSignature: typeof saved.senderSignature === 'string' ? saved.senderSignature.slice(0, 500) : '', customPrompt: saved.customPrompt || '', voiceGuide: typeof saved.voiceGuide === 'string' ? saved.voiceGuide.slice(0, 1000) : '', queueIntervalSeconds: [30, 45, 60, 90].includes(Number(saved.queueIntervalSeconds)) ? Number(saved.queueIntervalSeconds) : 30, queue, roleProfiles, roleProfileEditorRole, roleProfileEditorStoryId, writingStyles, selectedStyleId, people: composePeople.length ? composePeople : [newPerson()], outreach: [...archivedPeople, ...priorOutreach] };
     } catch {
       const roleProfiles = normalizeRoleProfiles({});
-      return { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', voiceGuide: '', queueIntervalSeconds: 30, queue: null, roleProfiles, roleProfileEditorRole: roles[0], roleProfileEditorStoryId: roleProfiles[roles[0]][0].id, writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] };
+      return { senderName: '', senderFocus: '', senderContext: '', senderSignature: '', customPrompt: '', voiceGuide: '', queueIntervalSeconds: 30, queue: null, roleProfiles, roleProfileEditorRole: roles[0], roleProfileEditorStoryId: roleProfiles[roles[0]][0].id, writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] };
     }
   }
   function normalizeWritingStyles(styles) {
@@ -106,9 +106,12 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       <div class="person-fields">
         <label>Name<input data-field="name" value="${esc(person.name)}" placeholder="Their name" autocomplete="off" /></label>
         <label class="email-field">Email<input data-field="email" type="email" value="${esc(person.email)}" placeholder="name@company.com" autocomplete="off" /></label>
-        <label>Role they need<select data-field="role"><option value="">Choose a role</option>${roles.map(role => `<option ${person.role === role ? 'selected' : ''}>${esc(role)}</option>`).join('')}</select></label>
+        <label>Role category<select data-field="role"><option value="">Choose a role</option>${roles.map(role => `<option ${person.role === role ? 'selected' : ''}>${esc(role)}</option>`).join('')}</select></label>
         <label>Company<input data-field="company" value="${esc(person.company)}" placeholder="Company or team" /></label>
-        <label class="wide-field">Why this person? <span style="color:#aab2aa">(optional)</span><textarea data-field="context" placeholder="A shared interest, their work, or where you found them">${esc(person.context)}</textarea></label>
+        <label>Job title<input data-field="jobTitle" maxlength="160" value="${esc(person.jobTitle || '')}" placeholder="Exact title from the posting" /></label>
+        <label>Job ID<input data-field="jobId" maxlength="80" value="${esc(person.jobId || '')}" placeholder="e.g. REQ-20418" /></label>
+        <label class="wide-field job-description-field">Job description <span style="color:#aab2aa">(optional · up to 6,000 characters)</span><textarea data-field="jobDescription" maxlength="6000" rows="5" placeholder="Paste the job description. The model will use it to find a truthful match with your profile; it won't treat requirements as your experience.">${esc(person.jobDescription || '')}</textarea><small class="job-description-note">Sent to your selected model provider when you generate this email.</small></label>
+        <label class="wide-field">Why this contact? <span style="color:#aab2aa">(optional)</span><textarea data-field="context" maxlength="1000" placeholder="A real detail about this recruiter, hiring manager, or how you found them">${esc(person.context)}</textarea></label>
       </div>
       ${person.subject || person.body ? `<div class="draft-box"><div class="draft-fields"><label>Subject<input data-field="subject" value="${esc(person.subject)}" placeholder="Subject" /></label><label>Message<textarea data-field="body" placeholder="Your note">${esc(person.body)}</textarea></label></div><div class="draft-actions"><button class="small-action" data-action="copy-subject">Copy subject</button><button class="small-action" data-action="copy-body">Copy body</button><button class="small-action" data-action="copy-all">Copy both</button><button class="small-action primary" data-action="compose">Open in Gmail ↗</button><button class="small-action" data-action="gmail-draft" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}</div></div>` : ''}
       ${person.error ? `<div class="draft-error">${esc(person.error)}</div>` : ''}
@@ -225,7 +228,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       const status = person.status === 'replied' ? '<span class="status-pill replied">Reply received</span>' : person.status === 'sent' ? `<span class="status-pill ${isDue ? 'due' : ''}">${person.replyCheck === 'no_reply' ? 'No reply yet · check ' : isDue ? 'Follow-up due' : 'Follow up '}${new Date(person.followUpAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : '<span class="status-pill">Draft ready</span>';
       const actions = person.status === 'sent' ? `<button class="small-action" data-action="replied" data-person="${esc(person.id)}">Yes, got a reply</button><button class="small-action" data-action="no-reply" data-person="${esc(person.id)}">No reply yet</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>` : `<button class="small-action" data-action="mark-sent" data-person="${esc(person.id)}">Mark sent · follow up in 2 days</button><button class="small-action" data-action="compose" data-person="${esc(person.id)}">Open in Gmail ↗</button>`;
       const resumeAction = `<button class="small-action" data-action="email-with-resume" data-person="${esc(person.id)}">Download email + resume</button><button class="small-action primary" data-action="gmail-draft" data-person="${esc(person.id)}" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}`;
-      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
+      return `<article class="outreach-card"><div class="outreach-person"><span class="person-avatar">${esc(initials(person.name))}</span><span><strong>${esc(person.name || person.email || 'New contact')}</strong><small>${esc([person.jobTitle || person.role, person.company].filter(Boolean).join(' · ') || 'Role not set')}</small><small class="outreach-email">${esc(person.email || 'No email saved')}${person.jobId ? ` · Job ID ${esc(person.jobId)}` : ''}</small></span></div><div class="outreach-subject"><strong>${esc(person.subject || 'Untitled note')}</strong><small>${status} ${person.status === 'sent' ? `<span style="margin-left:5px">Sent ${new Date(person.sentAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` : ''}</small></div><div class="outreach-tools">${actions}${resumeAction}</div><details class="outreach-message"><summary>View saved message</summary><div class="outreach-message-body"><p>${esc(person.body || 'No message body saved.')}</p><div class="draft-actions"><button class="small-action" data-action="copy-subject" data-person="${esc(person.id)}">Copy subject</button><button class="small-action" data-action="copy-body" data-person="${esc(person.id)}">Copy body</button><button class="small-action" data-action="copy-all" data-person="${esc(person.id)}">Copy both</button></div></div></details></article>`;
     }).join('');
   }
   function showToast(message) {
@@ -239,7 +242,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     state.people = state.people.filter(item => item.id !== person.id);
   }
   function ensureComposeRow() {
-    const hasEmptyRow = state.people.some(person => !person.name && !person.email && !person.role && !person.company && !person.context && !person.subject && !person.body);
+    const hasEmptyRow = state.people.some(person => !person.name && !person.email && !person.role && !person.company && !person.jobTitle && !person.jobId && !person.jobDescription && !person.context && !person.subject && !person.body);
     if (!hasEmptyRow && state.people.length < MAX_PEOPLE) state.people.push(newPerson());
     if (!state.people.length) state.people.push(newPerson());
   }
@@ -539,13 +542,40 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     return {
       senderName: state.senderName.trim(), senderFocus: state.senderFocus.trim(), senderExperience: state.senderContext.trim(),
       roleProfile, framingStyle: state.selectedStyleId || 'natural', voiceGuide: (state.voiceGuide || '').trim(),
-      recipientName: person.name.trim(), targetRole: person.role, company: person.company.trim(), recipientContext: person.context.trim(), customDirection: state.customPrompt.trim()
+      senderSignature: state.senderSignature.trim(), recipientName: person.name.trim(), targetRole: person.role, company: person.company.trim(),
+      jobTitle: (person.jobTitle || '').trim(), jobId: (person.jobId || '').trim(), jobDescription: (person.jobDescription || '').trim().slice(0, 6000), recipientContext: person.context.trim(), customDirection: state.customPrompt.trim()
     };
   }
   async function generatePerson(person) {
     const context = buildContext(person);
     const result = await runGoodsendAgent({ context, styleInstruction: getWritingStyle(context.framingStyle).instructions, requestCompletion });
-    person.subject = result.subject.trim(); person.body = result.body.trim(); person.status = 'draft'; person.sentAt = null; person.followUpAt = null; person.error = '';
+    person.subject = ensureJobSubject(result.subject.trim(), context.jobTitle, context.jobId);
+    const bodyWithApplicationDetails = ensureJobDetails(result.body.trim(), context.jobTitle, context.jobId);
+    person.body = addSignature(bodyWithApplicationDetails, context.senderSignature, context.senderName); person.status = 'draft'; person.sentAt = null; person.followUpAt = null; person.error = '';
+  }
+  function ensureJobSubject(subject, jobTitle, jobId) {
+    if (!jobTitle && !jobId) return subject;
+    const titlePresent = !jobTitle || subject.toLocaleLowerCase().includes(jobTitle.toLocaleLowerCase());
+    const idPresent = !jobId || subject.includes(jobId);
+    return titlePresent && idPresent ? subject : `Application: ${jobTitle || 'Open role'}${jobId ? ` · ${jobId}` : ''}`;
+  }
+  function ensureJobDetails(body, jobTitle, jobId) {
+    if (!jobTitle && !jobId) return body;
+    const titlePresent = !jobTitle || body.toLocaleLowerCase().includes(jobTitle.toLocaleLowerCase());
+    const idPresent = !jobId || body.includes(jobId);
+    if (titlePresent && idPresent) return body;
+    const role = jobTitle || 'this opening';
+    const id = jobId ? ` (Job ID ${jobId})` : '';
+    return `${body}\n\nI’m applying for the ${role}${id} and would appreciate your consideration.`;
+  }
+  function addSignature(body, customSignature, senderName) {
+    let message = body.trim().replace(/\n\s*(?:best(?: regards)?|kind regards|regards|sincerely|thanks|thank you|cheers|warmly)[,!]?\s*$/i, '').trim();
+    if (senderName) {
+      const signatureLine = new RegExp(`\\n\\s*(?:best(?: regards)?|kind regards|regards|sincerely|thanks|thank you|cheers|warmly)[,!]?\\s*\\n\\s*${senderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i');
+      message = message.replace(signatureLine, '').trim();
+    }
+    const signature = customSignature.trim() || (senderName.trim() ? `Best,\n${senderName.trim()}` : '');
+    return signature ? `${message}\n\n${signature}` : message;
   }
   function waitForQueue(ms) {
     return new Promise(resolve => {
@@ -630,7 +660,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
       state.queue.pauseReason = '';
       state.queue.nextRunAt = 0;
     } else {
-      const candidates = state.people.filter(person => person.email || person.name || person.role || person.company || person.context);
+      const candidates = state.people.filter(person => person.email || person.name || person.role || person.company || person.jobTitle || person.jobId || person.jobDescription || person.context);
       if (!candidates.length) { showToast('Add a person before writing notes.'); return; }
       const seen = new Set();
       for (const person of candidates) {
@@ -694,7 +724,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     person.status = 'sent'; person.sentAt = new Date().toISOString(); person.followUpAt = new Date(Date.now() + FOLLOW_UP_DAYS * 86400000).toISOString(); person.repliedAt = null; persist(); renderPeople(); showToast('Marked sent. Your follow-up will be due in two days.');
   }
   function exportCsv() {
-    const rows = [['name','email','role','company','status','subject','body','sent_at','follow_up_at'], ...[...state.outreach, ...state.people].filter(person => person.email || person.subject).map(person => [person.name, person.email, person.role, person.company, person.status, person.subject, person.body, person.sentAt || '', person.followUpAt || ''])];
+    const rows = [['name','email','role_category','company','job_title','job_id','job_description','status','subject','body','sent_at','follow_up_at'], ...[...state.outreach, ...state.people].filter(person => person.email || person.subject || person.jobTitle || person.jobId || person.jobDescription).map(person => [person.name, person.email, person.role, person.company, person.jobTitle || '', person.jobId || '', person.jobDescription || '', person.status, person.subject, person.body, person.sentAt || '', person.followUpAt || ''])];
     if (rows.length === 1) { showToast('There are no contacts to export yet.'); return; }
     const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'goodsend-outreach.csv'; link.click(); URL.revokeObjectURL(link.href);
@@ -718,7 +748,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   renderPeople();
   window.setInterval(updateSummary, 60000);
   window.setInterval(() => { if (state.queue?.status === 'running' && state.queue.nextRunAt) renderQueue(); }, 1000);
-  $('#senderName').value = state.senderName; $('#senderFocus').value = state.senderFocus; $('#senderContext').value = state.senderContext; $('#customPrompt').value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; $('#voiceGuide').value = state.voiceGuide || ''; $('#voiceGuideChars').textContent = `${(state.voiceGuide || '').length} / 1000`;
+  $('#senderName').value = state.senderName; $('#senderFocus').value = state.senderFocus; $('#senderContext').value = state.senderContext; $('#senderSignature').value = state.senderSignature || ''; $('#customPrompt').value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; $('#voiceGuide').value = state.voiceGuide || ''; $('#voiceGuideChars').textContent = `${(state.voiceGuide || '').length} / 1000`;
   setApiStatus();
   updateSidebar();
   renderRoleProfile();
@@ -733,7 +763,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   $('#peopleList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.closest('[data-person]')?.dataset.person); });
   $('#outreachList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.dataset.person); });
   $('#addPerson').addEventListener('click', () => { if (state.people.length >= MAX_PEOPLE) return; state.people.push(newPerson()); persist(); renderPeople(); $('#peopleList article:last-child [data-field="name"]').focus(); });
-  for (const [id, key] of [['senderName','senderName'], ['senderFocus','senderFocus'], ['senderContext','senderContext']]) $(`#${id}`).addEventListener('input', event => { state[key] = event.target.value; persist(); });
+  for (const [id, key] of [['senderName','senderName'], ['senderFocus','senderFocus'], ['senderContext','senderContext'], ['senderSignature','senderSignature']]) $(`#${id}`).addEventListener('input', event => { state[key] = event.target.value.slice(0, key === 'senderSignature' ? 500 : 3000); if (event.target.value.length > state[key].length) event.target.value = state[key]; persist(); });
   $('#customPrompt').addEventListener('input', event => { state.customPrompt = event.target.value.slice(0, 500); if (event.target.value.length > 500) event.target.value = state.customPrompt; $('#promptChars').textContent = `${state.customPrompt.length} / 500`; persist(); });
   $('#voiceGuide').addEventListener('input', event => { state.voiceGuide = event.target.value.slice(0, 1000); if (event.target.value.length > 1000) event.target.value = state.voiceGuide; $('#voiceGuideChars').textContent = `${state.voiceGuide.length} / 1000`; persist(); });
   $('#queueInterval').addEventListener('change', event => { state.queueIntervalSeconds = [30, 45, 60, 90].includes(Number(event.target.value)) ? Number(event.target.value) : 30; if (state.queue?.status === 'paused') state.queue.interval = state.queueIntervalSeconds; persist(); renderQueue(); });
@@ -820,5 +850,5 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   window.addEventListener('hashchange', updatePage);
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) { document.body.classList.remove('sidebar-mobile-open'); updateSidebar(); } });
   $('#testApi').addEventListener('click', testConnection); $('#saveApi').addEventListener('click', saveApi); $('#generateAll').addEventListener('click', generateAll); $('#exportCsv').addEventListener('click', exportCsv);
-  $('#clearOutreach').addEventListener('click', () => { if (queueLoopActive || generatingPeople.size) { showToast('Wait for the current draft to finish, then clear the workspace.'); return; } if (!confirm('Clear every person, draft, profile, follow-up, and saved resume from this browser? This cannot be undone.')) return; wakeQueue(); localStorage.removeItem(STORE_KEY); deleteResumeFile().then(renderResumeStatus).catch(() => {}); state = { senderName: '', senderFocus: '', senderContext: '', customPrompt: '', voiceGuide: '', queueIntervalSeconds: 30, queue: null, roleProfiles: normalizeRoleProfiles({}), roleProfileEditorRole: roles[0], roleProfileEditorStoryId: '', writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; state.roleProfileEditorStoryId = state.roleProfiles[roles[0]][0].id; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; $('#voiceGuide').value = ''; $('#voiceGuideChars').textContent = '0 / 1000'; renderRoleProfile(); renderResumeStatus(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
+  $('#clearOutreach').addEventListener('click', () => { if (queueLoopActive || generatingPeople.size) { showToast('Wait for the current draft to finish, then clear the workspace.'); return; } if (!confirm('Clear every person, draft, profile, follow-up, and saved resume from this browser? This cannot be undone.')) return; wakeQueue(); localStorage.removeItem(STORE_KEY); deleteResumeFile().then(renderResumeStatus).catch(() => {}); state = { senderName: '', senderFocus: '', senderContext: '', senderSignature: '', customPrompt: '', voiceGuide: '', queueIntervalSeconds: 30, queue: null, roleProfiles: normalizeRoleProfiles({}), roleProfileEditorRole: roles[0], roleProfileEditorStoryId: '', writingStyles: [], selectedStyleId: 'natural', people: [newPerson()], outreach: [] }; state.roleProfileEditorStoryId = state.roleProfiles[roles[0]][0].id; $('#senderName').value = ''; $('#senderFocus').value = ''; $('#senderContext').value = ''; $('#senderSignature').value = ''; $('#customPrompt').value = ''; $('#promptChars').textContent = '0 / 500'; $('#voiceGuide').value = ''; $('#voiceGuideChars').textContent = '0 / 1000'; renderRoleProfile(); renderResumeStatus(); renderWritingStyles(); renderPeople(); showToast('Workspace cleared.'); });
 })();

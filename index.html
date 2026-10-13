@@ -49,16 +49,16 @@
         <section class="editor-layout">
           <div class="left-column">
             <section class="panel people-panel">
-              <div class="section-heading"><div><span class="step">01</span><div><h2>Your people</h2><p>Add up to 25 people. A name and role make each note more personal.</p></div></div><span class="counter-pill" id="peopleCounter">01 / 25</span></div>
+              <div class="section-heading"><div><span class="step">01</span><div><h2>Your people and openings</h2><p>Add up to 25 contacts and paste the specific job posting for a tailored application note.</p></div></div><span class="counter-pill" id="peopleCounter">01 / 25</span></div>
               <div class="people-list" id="peopleList"></div>
               <button class="add-person" id="addPerson"><span>＋</span> Add another person <small id="addRemaining">24 spots left</small></button>
             </section>
 
             <section class="panel direction-panel">
-              <div class="section-heading"><div><span class="step">02</span><div><h2>Set the direction</h2><p>One extra thought can help the draft sound more like you.</p></div></div><span class="optional-tag">OPTIONAL</span></div>
+              <div class="section-heading"><div><span class="step">02</span><div><h2>Fine tune this email</h2><p>The job posting and your profile provide the facts. Add a preference for this contact if you want.</p></div></div><span class="optional-tag">OPTIONAL</span></div>
               <div class="active-style-card"><span class="active-style-icon">✎</span><div><small>WRITING STYLE</small><strong id="activeStyleName">Natural</strong><p id="activeStyleDescription">Warm, clear, and conversational.</p></div><a href="#styles" class="text-button">Change style ↗</a></div>
-              <textarea id="customPrompt" rows="3" placeholder="For example: Keep it under 100 words, mention my campus robotics project, and ask if they have 15 minutes next week."></textarea>
-              <div class="prompt-foot"><span>✦ This note is included in both writing passes.</span><span id="promptChars">0 / 500</span></div>
+              <textarea id="customPrompt" rows="3" placeholder="For example: Lead with the project that best matches the posting. Be direct about asking to be considered; keep the tone warm and concise."></textarea>
+              <div class="prompt-foot"><span>✦ Checked against your profile and job posting.</span><span id="promptChars">0 / 500</span></div>
             </section>
           </div>
 
@@ -83,6 +83,7 @@
               <div class="section-heading"><div><span class="step">01</span><div><h2>Your base profile</h2><p>Add your name, focus, and experience that applies across roles.</p></div></div><span class="optional-tag">SAVED HERE</span></div>
               <div class="profile-grid"><label>Your name<input id="senderName" placeholder="e.g. Alex Morgan" autocomplete="name" /></label><label>Current focus<input id="senderFocus" placeholder="e.g. CS student interested in climate tech" /></label></div>
               <label class="field-label">General background or transferable experience<textarea id="senderContext" rows="4" placeholder="Add a short summary of your background, strengths, and interests that apply across roles. Put role specific project stories below."></textarea></label>
+              <label class="field-label signature-field">Reusable email signature <span class="profile-hint">This exact signature is appended to every new draft. Leave blank to use “Best,” and your profile name.</span><textarea id="senderSignature" rows="4" maxlength="500" placeholder="Best,&#10;Your Name&#10;LinkedIn: linkedin.com/in/yourname&#10;Portfolio: yoursite.com"></textarea><small class="signature-note">Only include contact details you want to share.</small></label>
             </section>
             <section class="panel role-profile-panel">
               <div class="section-heading"><div><span class="step">02</span><div><h2>Role specific project stories</h2><p>Save several stories per role. god send uses the most relevant one for each contact.</p></div></div><button class="outline-button" id="addRoleStory" type="button">＋ Add story</button></div>

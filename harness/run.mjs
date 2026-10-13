@@ -27,7 +27,7 @@ if (live && !apiKey) {
 const callLog = [];
 async function requestCompletion(messages, temperature) {
   const started = performance.now();
-  const stage = messages[0]?.content?.toLocaleLowerCase().includes('extract concise, grounded facts') ? 'fact_extraction' : 'draft_generation';
+  const stage = messages[1]?.content?.startsWith('TASK\nPrepare a short, evidence-only brief') ? 'fact_extraction' : 'draft_generation';
   let content;
   if (live) {
     const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -40,7 +40,7 @@ async function requestCompletion(messages, temperature) {
     content = payload.choices?.[0]?.message?.content;
     if (!content) throw new Error('Provider returned an empty completion.');
   } else {
-    content = messages[0]?.content?.startsWith('Extract grounded facts')
+    content = stage === 'fact_extraction'
       ? 'Offline fixture provider: supplied sender, contact, and role story facts only; no additional claims are supported.'
       : offlineDraft(messages);
   }
@@ -50,7 +50,7 @@ async function requestCompletion(messages, temperature) {
 
 function offlineDraft(messages) {
   const prompt = messages.at(-1)?.content || '';
-  const contextPart = prompt.split('\n\nContext: ')[1]?.split('\nGrounded fact sheet: ')[0];
+  const contextPart = prompt.split('REFERENCE DATA (JSON):\n')[1]?.split('\n\nEVIDENCE BRIEF:')[0];
   const context = JSON.parse(contextPart || '{}');
   const cueWords = `${context.targetRole || ''} ${context.recipientContext || ''}`.toLocaleLowerCase().match(/[a-z]{4,}/g) || [];
   const story = (context.roleProfile || []).map(candidate => {
@@ -60,13 +60,16 @@ function offlineDraft(messages) {
   const name = context.recipientName || 'there';
   const sender = context.senderName || 'I';
   const object = story.built || context.senderFocus || 'a project';
-  const title = story.title ? ` (${story.title})` : '';
-  const why = story.why ? ` I started it to ${story.why.replace(/[.!?]+$/, '')}.` : '';
-  const how = story.how ? ` I approached it by ${story.how.replace(/[.!?]+$/, '')}.` : '';
-  const result = story.result ? ` The supplied result was: ${story.result.replace(/[.!?]+$/, '')}.` : '';
-  const role = context.targetRole || 'your team';
-  const body = `Hi ${name},\n\nI’m exploring ${role.toLowerCase()} work and noticed ${context.company || 'your team'} is hiring. I built ${object}${title}.${why}${how}${result} If you have time, would you be open to a short conversation about the role?\n\nThanks,\n${sender}`;
-  return JSON.stringify({ subject: `${role} at ${context.company || 'your team'}`, body });
+  const title = story.title ? ` for ${story.title}` : '';
+  const whyText = story.why?.replace(/[.!?]+$/, '').replace(/^to\s+/i, '');
+  const howText = story.how?.replace(/[.!?]+$/, '').replace(/^used\s+/i, 'using ');
+  const why = whyText ? ` I wanted to ${whyText}.` : '';
+  const how = howText ? ` I did that by ${howText}.` : '';
+  const result = story.result ? ` The result was ${story.result.replace(/[.!?]+$/, '')}.` : '';
+  const role = context.jobTitle || context.targetRole || 'the open role';
+  const id = context.jobId ? ` (Job ID ${context.jobId})` : '';
+  const body = `Hi ${name},\n\nI’m applying for ${role}${id}. ${context.jobDescription ? `The posting's focus on ${context.jobDescription.slice(0, 70).replace(/[.!?]+$/, '')} connects with my experience.` : `My background in ${context.senderFocus || role} is relevant to this work.`} I built ${object}${title}.${why}${how}${result} I’d appreciate your consideration. Would you be open to a brief conversation about my fit?\n\nBest,\n${sender}`;
+  return JSON.stringify({ subject: `Application: ${role}${context.jobId ? ` · ${context.jobId}` : ''}`, body });
 }
 
 function grade(result, checks, caseCallCount) {
