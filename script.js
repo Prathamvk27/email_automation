@@ -550,8 +550,15 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const context = buildContext(person);
     const result = await runGoodsendAgent({ context, styleInstruction: getWritingStyle(context.framingStyle).instructions, requestCompletion });
     person.subject = ensureJobSubject(result.subject.trim(), context.jobTitle, context.jobId);
-    const bodyWithApplicationDetails = ensureJobDetails(result.body.trim(), context.jobTitle, context.jobId);
+    const bodyWithGreeting = ensureGreeting(result.body.trim(), context.recipientName);
+    const bodyWithApplicationDetails = ensureJobDetails(bodyWithGreeting, context.jobTitle, context.jobId);
     person.body = addSignature(bodyWithApplicationDetails, context.senderSignature, context.senderName); person.status = 'draft'; person.sentAt = null; person.followUpAt = null; person.error = '';
+  }
+  function ensureGreeting(body, recipientName) {
+    const greeting = recipientName ? `Hi ${recipientName},` : 'Hello,';
+    const greetingAtStart = /^(?:(?:hi|hello|dear)\b(?:\s+[^,\n]+)?|good\s+(?:morning|afternoon|evening)(?:\s+[^,\n]+)?)[,!:.]?\s*/i;
+    const withoutLeadingGreeting = String(body).replace(/\r\n?/g, '\n').trim().replace(greetingAtStart, '').trim();
+    return `${greeting}\n\n${withoutLeadingGreeting}`;
   }
   function ensureJobSubject(subject, jobTitle, jobId) {
     if (!jobTitle && !jobId) return subject;

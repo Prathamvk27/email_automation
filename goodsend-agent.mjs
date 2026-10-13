@@ -27,16 +27,17 @@ export function buildDraftMessages(context, facts, styleInstruction = DEFAULT_ST
 Write one concise email from the applicant to the named contact about the specific open role. The goal is to be considered for this job and make one natural, concrete next-step request. This is a genuine application email, not a networking note that hides the applicant's intent.
 
 BUILD THE EMAIL IN THIS ORDER
-1. Open with the real reason for writing. Use the contact's name when supplied. Mention the role or a concrete posting detail; refer to the recipient's work only when the user supplied that context.
-2. Connect one requirement from the job posting to one relevant fact or project from the applicant profile. State only the applicant's own contribution. If no direct evidence matches, use a truthful adjacent skill or omit the match; never claim a requirement is met without evidence.
-3. Clearly state the applicant is applying for or seeking consideration for the exact job title. Include the job ID exactly as supplied when present. Ask for one next step, such as a brief conversation about candidacy. Do not ask for a referral unless the user explicitly requests one.
+1. Greeting: the very first line must be a salutation. If recipientName is supplied, write “Hi [recipientName],” using that name exactly. If no name is supplied, write “Hello,”. Put a blank line after the greeting. Never omit the greeting or invent a recipient name.
+2. Open with the real reason for writing. Mention the role or a concrete posting detail; refer to the recipient's work only when the user supplied that context.
+3. Connect one requirement from the job posting to one relevant fact or project from the applicant profile. State only the applicant's own contribution. If no direct evidence matches, use a truthful adjacent skill or omit the match; never claim a requirement is met without evidence.
+4. Clearly state the applicant is applying for or seeking consideration for the exact job title. Include the job ID exactly as supplied when present. Ask for one next step, such as a brief conversation about candidacy. Do not ask for a referral unless the user explicitly requests one.
 
 HUMAN, PROFESSIONAL VOICE
 - Aim for 80–120 words before the signature. Use natural contractions, plain words, and varied sentence lengths.
 - Write like a thoughtful applicant who took a moment to connect their experience to this opening. Be warm and direct, not overeager, flattering, stiff, or salesy.
 - Avoid stock lines such as “I hope you’re doing well,” “I came across your profile,” “I’m impressed by your work,” and “I’m reaching out to express my interest.” Do not claim research, familiarity, or a relationship that is not in the supplied context.
 - Use at most one project story. Keep its what, why, how, and result in a single readable sentence when those facts are supplied. Omit missing results and irrelevant project details.
-- Do not repeat the applicant's name in the opening. Do not add a greeting/sign-off or signature; the app appends the saved signature exactly.
+- Do not repeat the applicant's name in the opening. Include the required recipient greeting, but do not add a sign-off or signature; the app appends the saved signature exactly.
 - Make one specific, courteous request. Avoid “pick your brain,” multiple questions, urgency, and promises about availability not supplied by the user.
 
 SUBJECT
@@ -59,7 +60,7 @@ Return ONLY valid JSON with exactly two non-empty string fields: subject and bod
 
 REFERENCE DATA (JSON):\n${JSON.stringify(factsContext)}\n\nEVIDENCE BRIEF:\n${facts}`;
   return [
-    { role: 'system', content: `Write a polished but natural application email for a real person. ${hasJob ? 'State the applicant’s intent to be considered for the supplied job.' : 'State the applicant’s purpose clearly without inventing a job posting.'} Prioritize factual accuracy, the exact role details, and one clear next step. Use the requested JSON format exactly.` },
+    { role: 'system', content: `Write a polished but natural application email for a real person. Start the body with the required salutation. ${hasJob ? 'State the applicant’s intent to be considered for the supplied job.' : 'State the applicant’s purpose clearly without inventing a job posting.'} Prioritize factual accuracy, the exact role details, and one clear next step. Use the requested JSON format exactly.` },
     { role: 'user', content: prompt }
   ];
 }
