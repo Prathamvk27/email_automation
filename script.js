@@ -1,6 +1,7 @@
-import { runGoodsendAgent } from './goodsend-agent.mjs';
+import { runGodSendAgent } from './godsend-agent.mjs';
 
 (() => {
+  // Keep these legacy storage IDs stable so existing GodSend data on this device remains available.
   const STORE_KEY = 'goodsend.workspace.v1';
   const API_PREFS_KEY = 'goodsend.api.preferences.v1';
   const API_KEY_KEY = 'goodsend.api.key.v1';
@@ -580,7 +581,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     showToast('Gmail access cleared.');
   }
   async function makeGmailRawMessage(person, resume) {
-    const boundary = `goodsend-${crypto.randomUUID()}`;
+    const boundary = `godsend-${crypto.randomUUID()}`;
     const safeSubject = (person.subject || '').replace(/[\r\n]+/g, ' ');
     const encodedSubject = bytesToBase64(new TextEncoder().encode(safeSubject));
     const body = bytesToBase64(new TextEncoder().encode((person.body || '').replace(/\r?\n/g, '\r\n')));
@@ -727,7 +728,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const context = buildContext(person);
     context.revisionDirection = String(revision.direction || '').trim();
     context.previousDraft = revision.previousDraft || null;
-    const result = await runGoodsendAgent({ context, styleInstruction: getWritingStyle(context.framingStyle).instructions, requestCompletion });
+    const result = await runGodSendAgent({ context, styleInstruction: getWritingStyle(context.framingStyle).instructions, requestCompletion });
     person.framingStyleId = context.framingStyle;
     person.subject = restoreReferenceCapitalization(ensureJobSubject(result.subject.trim(), context.jobTitle, context.jobId), [context.recipientName, context.senderName, context.company, context.jobTitle, context.jobId]);
     const bodyWithGreeting = ensureGreeting(result.body.trim(), context.recipientName);
@@ -924,14 +925,14 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const rows = [['name','email','role_category','company','job_title','job_id','job_description','status','subject','body','sent_at','follow_up_at'], ...[...state.outreach, ...state.people].filter(person => person.email || person.subject || person.jobTitle || person.jobId || person.jobDescription).map(person => [person.name, person.email, person.role, person.company, person.jobTitle || '', person.jobId || '', person.jobDescription || '', person.status, person.subject, person.body, person.sentAt || '', person.followUpAt || ''])];
     if (rows.length === 1) { showToast('There are no contacts to export yet.'); return; }
     const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
-    const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'goodsend-outreach.csv'; link.click(); URL.revokeObjectURL(link.href);
+    const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'godsend-outreach.csv'; link.click(); URL.revokeObjectURL(link.href);
   }
   function exportContactsCsv() {
     if (!state.contacts.length) { showToast('There are no saved contacts to export yet.'); return; }
     const fields = ['name', 'email', 'role', 'company', 'jobTitle', 'jobId', 'jobDescription', 'context', 'starred'];
     const rows = [['name', 'email', 'role_category', 'company', 'job_title', 'job_id', 'job_description', 'context', 'starred'], ...state.contacts.map(contact => fields.map(field => field === 'starred' ? (contact.starred ? 'yes' : 'no') : contact[field] || ''))];
     const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
-    const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'goodsend-contacts.csv'; link.click(); URL.revokeObjectURL(link.href);
+    const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'godsend-contacts.csv'; link.click(); URL.revokeObjectURL(link.href);
     showToast(`${state.contacts.length} saved contact${state.contacts.length === 1 ? '' : 's'} exported.`);
   }
   function removeOutreach(person) {

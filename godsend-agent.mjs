@@ -86,7 +86,7 @@ export function parseDraft(raw) {
   return { subject: result.subject.trim(), body: result.body.trim() };
 }
 
-export async function runGoodsendAgent({ context, styleInstruction, requestCompletion }) {
+export async function runGodSendAgent({ context, styleInstruction, requestCompletion }) {
   const facts = await requestCompletion(buildFactMessages(context), 0.2);
   const rawDraft = await requestCompletion(buildDraftMessages(context, facts, styleInstruction), 0.55);
   return { facts, ...parseDraft(rawDraft) };

@@ -1,7 +1,7 @@
 {
-  "suite": "goodsend-agent-smoke-v1",
+  "suite": "godsend-agent-smoke-v1",
   "version": "1.0.0",
-  "description": "Synthetic regression cases for Goodsend's fact extraction and email drafting agent.",
+  "description": "Synthetic regression cases for GodSend's fact extraction and email drafting agent.",
   "cases": [
     {
       "id": "single-relevant-story",

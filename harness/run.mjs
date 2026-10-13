@@ -2,7 +2,7 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runGoodsendAgent } from '../goodsend-agent.mjs';
+import { runGodSendAgent } from '../godsend-agent.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
@@ -12,15 +12,15 @@ const valueAfter = name => {
   return index >= 0 ? process.argv[index + 1] : undefined;
 };
 const live = flags.has('--live');
-const baseUrl = (valueAfter('--base-url') || process.env.GOODSEND_API_BASE || 'https://api.openai.com/v1').replace(/\/+$/, '');
-const model = valueAfter('--model') || process.env.GOODSEND_MODEL || 'gpt-4o-mini';
-const apiKey = process.env.GOODSEND_API_KEY || process.env.OPENAI_API_KEY;
-const outputPath = resolve(repoRoot, valueAfter('--output') || `artifacts/goodsend-evals/${new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-')}.json`);
+const baseUrl = (valueAfter('--base-url') || process.env.GODSEND_API_BASE || 'https://api.openai.com/v1').replace(/\/+$/, '');
+const model = valueAfter('--model') || process.env.GODSEND_MODEL || 'gpt-4o-mini';
+const apiKey = process.env.GODSEND_API_KEY || process.env.OPENAI_API_KEY;
+const outputPath = resolve(repoRoot, valueAfter('--output') || `artifacts/godsend-evals/${new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-')}.json`);
 const suite = JSON.parse(await readFile(resolve(here, 'cases.json'), 'utf8'));
 const startedAt = new Date().toISOString();
 
 if (live && !apiKey) {
-  console.error('Set GOODSEND_API_KEY (or OPENAI_API_KEY) before using --live.');
+  console.error('Set GODSEND_API_KEY (or OPENAI_API_KEY) before using --live.');
   process.exit(2);
 }
 
@@ -89,7 +89,7 @@ const caseResults = [];
 for (const item of suite.cases) {
   const firstCall = callLog.length;
   try {
-    const result = await runGoodsendAgent({
+    const result = await runGodSendAgent({
       context: item.context,
       styleInstruction: item.context.framingStyle === 'abigayle'
         ? 'For the single role profile story you chose, shape its project sentence in this order: what I built or did → why I did it → how I did it → result. Use only supplied fields; do not invent a result.'
