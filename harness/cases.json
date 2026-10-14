@@ -1,6 +1,6 @@
 {
   "suite": "goodsend-agent-smoke-v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Synthetic regression cases for Goodsend's fact extraction and email drafting agent.",
   "cases": [
     {
@@ -80,6 +80,25 @@
         "customDirection": ""
       },
       "checks": { "required": ["Sam", "Elena", "catalog"], "forbidden": ["soil moisture", "microcontroller"], "minWords": 30, "maxWords": 160 }
+    },
+    {
+      "id": "job-details-are-optional",
+      "category": "edge",
+      "context": {
+        "senderName": "Maya Chen",
+        "senderFocus": "Frontend engineering",
+        "senderExperience": "I build accessible web interfaces.",
+        "roleProfile": [
+          { "title": "Transit map", "built": "An accessible route map", "why": "Helped riders find step-free routes", "how": "Used semantic HTML and keyboard testing", "result": "Presented it in a class demo" }
+        ],
+        "framingStyle": "natural",
+        "recipientName": "Tara",
+        "targetRole": "Frontend engineer",
+        "company": "Maple Works",
+        "recipientContext": "",
+        "customDirection": ""
+      },
+      "checks": { "required": ["Tara", "Maya", "Frontend engineer"], "forbidden": ["Job ID", "REQ-", "Application: Open role"], "minWords": 30, "maxWords": 160 }
     }
   ]
 }

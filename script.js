@@ -152,14 +152,14 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     list.innerHTML = state.people.map((person, index) => `<article class="person-card" data-person="${esc(person.id)}">
       <div class="person-topline"><span class="person-label">PERSON ${String(index + 1).padStart(2, '0')}</span><div class="person-actions"><button class="small-action write-single" data-action="generate" ${generatingAll || generatingPeople.has(person.id) ? 'disabled' : ''}>${generatingPeople.has(person.id) ? 'Writing…' : 'Write this note'}</button>${state.people.length > 1 ? `<button class="remove-person" data-action="remove" title="Remove person" aria-label="Remove person ${index + 1}">×</button>` : ''}</div></div>
       <div class="person-fields">
-        <label>Name<input data-field="name" value="${esc(person.name)}" placeholder="Their name" autocomplete="off" /></label>
-        <label class="email-field">Email<input data-field="email" type="email" value="${esc(person.email)}" placeholder="name@company.com" autocomplete="off" /></label>
-        <label>Role category<select data-field="role"><option value="">Choose a role</option>${roles.map(role => `<option ${person.role === role ? 'selected' : ''}>${esc(role)}</option>`).join('')}</select></label>
-        <label>Company<input data-field="company" value="${esc(person.company)}" placeholder="Company or team" /></label>
-        <label>Job title<input data-field="jobTitle" maxlength="160" value="${esc(person.jobTitle || '')}" placeholder="Exact title from the posting" /></label>
-        <label>Job ID<input data-field="jobId" maxlength="80" value="${esc(person.jobId || '')}" placeholder="e.g. REQ-20418" /></label>
-        <label class="wide-field job-description-field">Job description <span style="color:#aab2aa">(optional · up to 6,000 characters)</span><textarea data-field="jobDescription" maxlength="6000" rows="5" placeholder="Paste the job description. The model will use it to find a truthful match with your profile; it won't treat requirements as your experience.">${esc(person.jobDescription || '')}</textarea><small class="job-description-note">Sent to your selected model provider when you generate this email.</small></label>
-        <label class="wide-field">Why this contact? <span style="color:#aab2aa">(optional)</span><textarea data-field="context" maxlength="1000" placeholder="A real detail about this recruiter, hiring manager, or how you found them">${esc(person.context)}</textarea></label>
+        <label><span class="field-label-text">Name <span class="field-optional">(optional)</span></span><input data-field="name" value="${esc(person.name)}" placeholder="Their name" autocomplete="off" /></label>
+        <label class="email-field"><span class="field-label-text">Email <span class="field-required">(required)</span></span><input data-field="email" type="email" value="${esc(person.email)}" placeholder="name@company.com" autocomplete="off" /></label>
+        <label><span class="field-label-text">Role category <span class="field-optional">(optional)</span></span><select data-field="role"><option value="">Choose a role</option>${roles.map(role => `<option ${person.role === role ? 'selected' : ''}>${esc(role)}</option>`).join('')}</select></label>
+        <label><span class="field-label-text">Company <span class="field-optional">(optional)</span></span><input data-field="company" value="${esc(person.company)}" placeholder="Company or team" /></label>
+        <label><span class="field-label-text">Job title <span class="field-optional">(optional)</span></span><input data-field="jobTitle" maxlength="160" value="${esc(person.jobTitle || '')}" placeholder="Exact title from the posting" /></label>
+        <label><span class="field-label-text">Job ID <span class="field-optional">(optional)</span></span><input data-field="jobId" maxlength="80" value="${esc(person.jobId || '')}" placeholder="e.g. REQ-20418" /></label>
+        <label class="wide-field job-description-field"><span class="field-label-text">Job description <span class="field-optional">(optional · up to 6,000 characters)</span></span><textarea data-field="jobDescription" maxlength="6000" rows="5" placeholder="Paste the job description. The model will use it to find a truthful match with your profile; it won't treat requirements as your experience.">${esc(person.jobDescription || '')}</textarea><small class="job-description-note">Sent to your selected model provider when you generate this email.</small></label>
+        <label class="wide-field"><span class="field-label-text">Why this contact? <span class="field-optional">(optional)</span></span><textarea data-field="context" maxlength="1000" placeholder="A real detail about this recruiter, hiring manager, or how you found them">${esc(person.context)}</textarea></label>
       </div>
       ${person.subject || person.body ? `<div class="draft-box"><div class="draft-fields"><label>Subject<input data-field="subject" value="${esc(person.subject)}" placeholder="Subject" /></label><label>Message<textarea data-field="body" placeholder="Your note">${esc(person.body)}</textarea></label></div><div class="draft-actions"><button class="small-action" data-action="copy-subject">Copy subject</button><button class="small-action" data-action="copy-body">Copy body</button><button class="small-action" data-action="copy-all">Copy both</button><button class="small-action primary" data-action="compose">Open in Gmail ↗</button><button class="small-action" data-action="gmail-draft" ${gmailDrafting.has(person.id) ? 'disabled' : ''}>${gmailDrafting.has(person.id) ? 'Creating Gmail draft…' : 'Create Gmail draft + resume'}</button>${person.gmailDraftId ? `<a class="small-action gmail-review-link" href="https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(person.gmailDraftId)}" target="_blank" rel="noopener noreferrer">Review Gmail draft ↗</a>` : ''}</div></div>` : ''}
       ${person.error ? `<div class="draft-error">${esc(person.error)}</div>` : ''}
@@ -700,19 +700,32 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
     const stylesPage = location.hash === '#styles';
     const outreachPage = location.hash === '#outreach';
     const contactsPage = location.hash === '#contacts';
-    $('#composePage').hidden = profilePage || stylesPage || outreachPage || contactsPage;
+    const updatesPage = location.hash === '#updates';
+    $('#composePage').hidden = profilePage || stylesPage || outreachPage || contactsPage || updatesPage;
     $('#profilePage').hidden = !profilePage;
     $('#stylesPage').hidden = !stylesPage;
     $('#outreachPage').hidden = !outreachPage;
     $('#contactsPage').hidden = !contactsPage;
-    $('#breadcrumbPage').textContent = profilePage ? 'My profile' : stylesPage ? 'Writing styles' : outreachPage ? 'Outreach' : contactsPage ? 'Contacts' : 'Compose';
+    $('#updatesPage').hidden = !updatesPage;
+    $('#breadcrumbPage').textContent = profilePage ? 'My profile' : stylesPage ? 'Writing styles' : outreachPage ? 'Outreach' : contactsPage ? 'Contacts' : updatesPage ? 'Product updates' : 'Compose';
     for (const link of $('#mainNavigation').querySelectorAll('.nav-link')) {
-      const selected = profilePage ? link.hash === '#profile' : stylesPage ? link.hash === '#styles' : outreachPage ? link.hash === '#outreach' : contactsPage ? link.hash === '#contacts' : link.hash === '#compose';
+      const selected = profilePage ? link.hash === '#profile' : stylesPage ? link.hash === '#styles' : outreachPage ? link.hash === '#outreach' : contactsPage ? link.hash === '#contacts' : updatesPage ? link.hash === '#updates' : link.hash === '#compose';
       link.classList.toggle('active', selected);
       if (selected) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
     }
     window.scrollTo({ top: 0, behavior: outreachPage ? 'smooth' : 'auto' });
     if (contactsPage) renderContacts();
+  }
+  async function loadAppVersion() {
+    try {
+      const response = await fetch(new URL('./app-version.json', import.meta.url), { cache: 'no-store' });
+      if (!response.ok) return;
+      const metadata = await response.json();
+      if (!/^\d+\.\d+\.\d+$/.test(String(metadata.version || ''))) return;
+      document.querySelectorAll('[data-app-version]').forEach(element => { element.textContent = `v${metadata.version}`; });
+    } catch {
+      // Keep the source fallback label if version metadata is unavailable.
+    }
   }
   function buildContext(person) {
     const roleProfile = person.role ? (state.roleProfiles[person.role] || []).filter(story => [story.title, story.built, story.why, story.how, story.result].some(value => value.trim())) : [];
@@ -1211,6 +1224,7 @@ import { runGoodsendAgent } from './goodsend-agent.mjs';
   renderGmailStatus();
   renderWritingStyles();
   updatePage();
+  void loadAppVersion();
   $('#peopleList').addEventListener('input', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (!card || !field) return; const person = personById(card.dataset.person); if (!person) return; person[field] = event.target.value; syncContact(person); schedulePersist(); });
   $('#peopleList').addEventListener('change', event => { const card = event.target.closest('[data-person]'); const field = event.target.dataset.field; if (card && field) { const person = personById(card.dataset.person); if (person) { person[field] = event.target.value; syncContact(person); persist({ render: false }); } } });
   $('#peopleList').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) handleAction(button.dataset.action, button.closest('[data-person]')?.dataset.person); });

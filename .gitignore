@@ -1,0 +1,15 @@
+# Generated site and evaluation output
+public-site/
+dist/
+artifacts/
+
+# Local dependencies and secrets
+node_modules/
+.env
+.env.*
+!.env.example
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/

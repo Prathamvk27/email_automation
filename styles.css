@@ -40,6 +40,30 @@ body{font-size:15px}.topbar-left{display:flex;align-items:center;gap:14px}.sideb
 @media(max-width:960px){.queue-heading{display:grid}.queue-heading label{grid-template-columns:auto 1fr;align-items:center}.queue-heading select{justify-self:end}.queue-controls{flex-wrap:wrap}}
 .person-card .job-description-field textarea{min-height:130px;padding:11px;font-size:13px;line-height:1.55}.signature-field{margin-top:12px}.signature-field textarea{width:100%;min-height:95px;padding:10px;border:1px solid #e7ebe4;border-radius:7px;color:#34443b;font:13px/1.55 var(--sans);resize:vertical}.signature-field textarea:focus{border-color:#9bb69c;box-shadow:0 0 0 2px #e8f1e8;outline:none}.signature-note{color:#78847c;font-size:11px}
 .job-description-note{color:#78847c;font-size:11px;font-weight:400}
+.field-label-text{display:block}
+.field-optional{color:#637568;font-size:11px;font-weight:500;white-space:nowrap}
+.field-required{color:#355f51;font-size:11px;font-weight:700;white-space:nowrap}
+.updates-page{padding:34px 0 30px}
+.updates-page .profile-page-head h1 em{color:#64856e;font-family:var(--serif);font-weight:400}
+.release-hero{max-width:1000px;margin:0 0 15px;padding:22px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:20px}
+.release-status{display:inline-block;padding:5px 8px;border-radius:14px;background:#eaf2ec;color:#47694e;font:600 10px 'DM Mono',monospace;letter-spacing:.05em}
+.release-hero h2{margin:12px 0 6px;color:#34443b;font:700 24px var(--display);letter-spacing:-.7px}
+.release-hero p{max-width:650px;margin:0;color:#5e6b61;font-size:13px;line-height:1.6}
+.release-mark{min-width:175px;padding:14px 16px;border:1px solid #e3e9e0;border-radius:9px;background:#f9fbf7;text-align:center}
+.release-mark span,.release-mark small{display:block;color:#66756a;font-size:10px;letter-spacing:.05em}
+.release-mark strong{display:block;margin:5px 0;color:#355f51;font:700 23px var(--display)}
+.release-mark small{font-size:11px;letter-spacing:0}
+.release-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;max-width:1000px}
+.release-card{min-height:160px;padding:17px}
+.release-card>span{color:#6c806e;font:500 10px 'DM Mono',monospace;letter-spacing:.04em}
+.release-card h2{margin:10px 0 6px;color:#34443b;font:700 16px var(--display)}
+.release-card p{margin:0;color:#5e6b61;font-size:12px;line-height:1.55}
+.release-notes{max-width:1000px;margin-top:14px;padding:18px}
+.release-notes .section-heading{align-items:center;margin-bottom:7px}
+.release-notes ul{margin:0;padding-left:25px;color:#536257;font-size:12px;line-height:1.8}
+.release-footnote{max-width:1000px;margin:12px 0 0;color:#66746a;font-size:11px;line-height:1.6}
+@media(max-width:790px){.updates-page{padding-top:26px}.release-hero{grid-template-columns:1fr}.release-mark{justify-self:start}.release-grid{grid-template-columns:1fr}.release-card{min-height:0}}
+@media(max-width:560px){.updates-page{padding-top:19px}.release-hero,.release-notes{padding:15px}.release-hero h2{font-size:21px}.release-notes .section-heading{align-items:flex-start;flex-direction:column}}
 .empty-state[hidden]{display:none!important}
 .outreach-list-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin:0 0 16px}.outreach-search{display:grid;gap:6px;min-width:min(330px,100%);color:#65736a;font-size:11px;font-weight:600}.outreach-search input{width:100%;min-height:39px;padding:9px 12px;border:1px solid #dfe5dc;border-radius:7px;background:#fff;color:#34443b;font:13px var(--sans)}.outreach-search input:focus{border-color:#9bb69c;box-shadow:0 0 0 2px #e8f1e8;outline:none}.outreach-list-toolbar .outreach-filters{justify-content:flex-end;flex:1;padding:0;border:0}.outreach-search input::placeholder{color:#9aa39b}
 @media(max-width:790px){.outreach-list-toolbar{align-items:stretch;flex-direction:column;gap:9px}.outreach-search{min-width:0}.outreach-list-toolbar .outreach-filters{justify-content:flex-start}}

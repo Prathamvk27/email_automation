@@ -23,6 +23,7 @@
           <a class="nav-link" href="#styles" title="Writing styles" aria-label="Writing styles"><span class="nav-icon">✎</span><span class="nav-label">Writing styles</span></a>
           <a class="nav-link" href="#outreach" title="Outreach" aria-label="Outreach"><span class="nav-icon">↗</span><span class="nav-label">Outreach</span><span class="nav-count" id="navOutreachCount">00</span></a>
           <a class="nav-link" href="#contacts" title="Contacts" aria-label="Contacts"><span class="nav-icon">♙</span><span class="nav-label">Contacts</span><span class="nav-count" id="navContactsCount">00</span></a>
+          <a class="nav-link" href="#updates" title="Product updates" aria-label="Product updates"><span class="nav-icon">◷</span><span class="nav-label">Product updates</span><span class="nav-count" data-app-version>v0.1.0</span></a>
         </nav>
         <div class="sidebar-bottom">
           <div class="privacy-card"><span class="privacy-icon">◉</span><div><strong>Your notes stay yours.</strong><p>Drafts and profiles live in this browser.</p></div></div>
@@ -50,7 +51,7 @@
         <section class="editor-layout">
           <div class="left-column">
             <section class="panel people-panel">
-              <div class="section-heading"><div><span class="step">01</span><div><h2>Your people and openings</h2><p>Add up to 25 contacts and paste the specific job posting for a tailored application note.</p></div></div><span class="counter-pill" id="peopleCounter">01 / 25</span></div>
+              <div class="section-heading"><div><span class="step">01</span><div><h2>Your people and openings</h2><p>Add up to 25 contacts. Email is required; other contact and job details are optional.</p></div></div><span class="counter-pill" id="peopleCounter">01 / 25</span></div>
               <div class="people-list" id="peopleList"></div>
               <button class="add-person" id="addPerson"><span>＋</span> Add another person <small id="addRemaining">24 spots left</small></button>
             </section>
@@ -136,7 +137,7 @@
               <div class="gmail-connect-box">
                 <div><h3>Attach it directly in Gmail</h3><p>god send will save a draft with your resume attached. Review and send it yourself.</p></div>
                 <label class="field-label" for="gmailClientId">Google OAuth web client ID<input id="gmailClientId" type="text" autocomplete="off" placeholder="1234567890-abc.apps.googleusercontent.com" /></label>
-                <p class="gmail-setup-note">In Google Cloud, enable Gmail API, create a Web application OAuth client, and add this site origin as an authorized JavaScript origin: <code id="gmailOrigin"></code>. For local testing, add <code>http://localhost:4173</code>.</p>
+                <p class="gmail-setup-note">In Google Cloud, enable Gmail API, create a Web application OAuth client, and add this site origin as an authorized JavaScript origin: <code id="gmailOrigin"></code>. For local testing, add <code>http://127.0.0.1:4173</code>.</p>
                 <div class="gmail-controls"><button class="outline-button" id="saveGmailSettings" type="button">Save Gmail settings</button><button class="outline-button" id="connectGmail" type="button">Connect Gmail</button><button class="text-button" id="disconnectGmail" type="button" hidden>Disconnect</button></div>
                 <p id="gmailStatus" class="profile-hint" role="status">Gmail is not connected.</p>
                 <p class="profile-footer-note">Google’s Gmail compose permission can manage drafts and send mail. god send only creates drafts; it never calls Gmail’s send action. The access token stays in memory and clears when this page reloads. Your resume is sent to Gmail only when you create a draft.</p>
@@ -150,6 +151,20 @@
           <div class="style-library-intro"><span>✳</span><div><strong>Your active method applies to each person you draft.</strong><p>Saved here in this browser and included automatically when you write one note or a batch.</p></div></div>
           <section class="voice-guide panel"><label for="voiceGuide"><strong>Your reusable voice guide</strong><span>Set preferences that should shape every new email. Keep personal facts in My profile; keep one-off requests in Compose.</span></label><textarea id="voiceGuide" maxlength="1000" rows="4" placeholder="Example: Sound direct and curious, like a thoughtful note to a colleague. Prefer short sentences. Avoid hype and formal phrases. Don't use an em dash."></textarea><div class="prompt-foot"><span>Applied to every new draft</span><span id="voiceGuideChars">0 / 1000</span></div></section>
           <div class="style-library" id="writingStylesList"></div>
+        </section>
+        <section class="profile-page updates-page" id="updatesPage" aria-labelledby="updatesPageTitle" hidden>
+          <div class="profile-page-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> PRODUCT NOTES</div><h1 id="updatesPageTitle">What’s new in <em>god send</em></h1><p>The current product version, what it includes, and where to find setup and release details.</p></div><a class="outline-button" href="https://github.com/Prathamvk27/email_automation/blob/main/README.md" target="_blank" rel="noopener noreferrer">Setup guide ↗</a></div>
+          <section class="panel release-hero" aria-label="Current product version">
+            <div><span class="release-status">CURRENT PREVIEW</span><h2>god send <span data-app-version>v0.1.0</span></h2><p>Version 0.1 is the first tracked product release. Your drafts stay reviewable, your data stays in this browser, and nothing is sent automatically.</p></div>
+            <div class="release-mark"><span>PRODUCT VERSION</span><strong data-app-version>v0.1.0</strong><small>Pre-1.0 · active development</small></div>
+          </section>
+          <div class="release-grid" aria-label="Included in version 0.1">
+            <article class="panel release-card"><span>01 · WRITE</span><h2>Personal drafts</h2><p>Prepare one email or a paced batch for up to 25 contacts. Job title, job ID, and job description can be left blank.</p></article>
+            <article class="panel release-card"><span>02 · REVIEW</span><h2>Your facts, your approval</h2><p>Use a saved profile, role-specific stories, and writing methods. Review and edit each draft before you copy it or create a Gmail draft.</p></article>
+            <article class="panel release-card"><span>03 · TRACK</span><h2>Keep the conversation</h2><p>Contacts stay separate from staged emails. Track sent notes, replies, stars, and follow-up dates in this browser.</p></article>
+          </div>
+          <section class="panel release-notes"><div class="section-heading"><div><span class="step">0.1.0</span><div><h2>Initial product version</h2><p>Starting point for future releases and improvements.</p></div></div><a class="text-button" href="https://github.com/Prathamvk27/email_automation/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Full changelog ↗</a></div><ul><li>Compose, review, rework, and track personal outreach.</li><li>Save contacts, profile stories, writing methods, and drafts locally.</li><li>Optionally connect Gmail to create a draft with a saved resume attached.</li><li>Run locally or deploy the static site with GitHub Pages.</li></ul></section>
+          <p class="release-footnote">This is a static app. Replies and follow-ups are checked when you return; no background worker or automatic sending is included.</p>
         </section>
       </main>
     </div>
